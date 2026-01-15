@@ -126,18 +126,189 @@ export function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Add random jitter to a delay value to prevent thundering herd
+ * @param delay - Base delay in milliseconds
+ * @param jitterFactor - Factor for jitter (0-1), default 0.3 means ±30%
+ */
+export function addJitter(delay: number, jitterFactor = 0.3): number {
+  const jitter = delay * jitterFactor * (Math.random() * 2 - 1);
+  return Math.max(0, Math.round(delay + jitter));
+}
+
+/**
+ * Options for retry with exponential backoff
+ */
+export interface RetryOptions {
+  /** Maximum number of retry attempts (default: 3) */
+  maxRetries?: number;
+  /** Initial delay in milliseconds (default: 1000) */
+  initialDelay?: number;
+  /** Maximum delay in milliseconds (default: 30000) */
+  maxDelay?: number;
+  /** Multiplier for exponential backoff (default: 2) */
+  factor?: number;
+  /** Add random jitter to delays to prevent thundering herd (default: true) */
+  jitter?: boolean;
+  /** Jitter factor 0-1 (default: 0.3 means ±30%) */
+  jitterFactor?: number;
+  /** Function to determine if an error is retryable (default: all errors) */
+  isRetryable?: (error: unknown) => boolean;
+  /** Callback fired before each retry attempt */
+  onRetry?: (error: unknown, attempt: number, delay: number) => void;
+}
+
+/**
+ * Check if an error is a rate limit error (HTTP 429)
+ */
+export function isRateLimitError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const err = error as Record<string, unknown>;
+
+  // Check axios error response
+  if (err.response && typeof err.response === 'object') {
+    const response = err.response as Record<string, unknown>;
+    if (response.status === 429) return true;
+  }
+
+  // Check error message
+  if (typeof err.message === 'string') {
+    const message = err.message.toLowerCase();
+    if (message.includes('429') || message.includes('too many requests') || message.includes('rate limit')) {
+      return true;
+    }
+  }
+
+  // Check error code
+  if (err.code === 'ERR_TOO_MANY_REQUESTS' || err.status === 429) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if an error is a retryable network/transient error
+ */
+export function isRetryableError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const err = error as Record<string, unknown>;
+
+  // Rate limit errors are retryable
+  if (isRateLimitError(error)) return true;
+
+  // Check axios error response status codes
+  if (err.response && typeof err.response === 'object') {
+    const response = err.response as Record<string, unknown>;
+    const status = response.status as number;
+
+    // Retry on 5xx server errors and specific 4xx errors
+    if (status >= 500 && status < 600) return true;
+    if (status === 408) return true; // Request Timeout
+    if (status === 429) return true; // Too Many Requests
+  }
+
+  // Check for network errors
+  if (typeof err.code === 'string') {
+    const retryableCodes = [
+      'ECONNRESET',
+      'ECONNREFUSED',
+      'ETIMEDOUT',
+      'ENOTFOUND',
+      'ENETUNREACH',
+      'EAI_AGAIN',
+      'EPIPE',
+      'ERR_NETWORK',
+    ];
+    if (retryableCodes.includes(err.code)) return true;
+  }
+
+  // Check error message for transient issues
+  if (typeof err.message === 'string') {
+    const message = err.message.toLowerCase();
+    const retryableMessages = [
+      'network error',
+      'timeout',
+      'socket hang up',
+      'econnreset',
+      'econnrefused',
+    ];
+    if (retryableMessages.some((m) => message.includes(m))) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if an error is an invalid crumb error
+ */
+export function isInvalidCrumbError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const err = error as Record<string, unknown>;
+
+  // Check error message
+  if (typeof err.message === 'string') {
+    const message = err.message.toLowerCase();
+    if (message.includes('invalid crumb') || message.includes('unauthorized')) {
+      return true;
+    }
+  }
+
+  // Check axios response data for Yahoo-specific error
+  if (err.response && typeof err.response === 'object') {
+    const response = err.response as Record<string, unknown>;
+    if (response.data && typeof response.data === 'object') {
+      const data = response.data as Record<string, unknown>;
+      const finance = data.finance as Record<string, unknown> | undefined;
+      if (finance?.error && typeof finance.error === 'object') {
+        const financeError = finance.error as Record<string, unknown>;
+        if (financeError.code === 'Unauthorized' || financeError.description?.toString().includes('crumb')) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Retry a function with exponential backoff
+ *
+ * @param fn - The async function to retry
+ * @param options - Retry configuration options
+ * @returns The result of the function if successful
+ * @throws The last error if all retries fail
+ *
+ * @example
+ * ```typescript
+ * const result = await retry(
+ *   () => fetchData(),
+ *   {
+ *     maxRetries: 3,
+ *     initialDelay: 1000,
+ *     isRetryable: isRateLimitError,
+ *     onRetry: (err, attempt, delay) => console.log(`Retry ${attempt} in ${delay}ms`)
+ *   }
+ * );
+ * ```
  */
 export async function retry<T>(
   fn: () => Promise<T>,
-  options: {
-    maxRetries?: number;
-    initialDelay?: number;
-    maxDelay?: number;
-    factor?: number;
-  } = {}
+  options: RetryOptions = {}
 ): Promise<T> {
-  const { maxRetries = 3, initialDelay = 1000, maxDelay = 30000, factor = 2 } = options;
+  const {
+    maxRetries = 3,
+    initialDelay = 1000,
+    maxDelay = 30000,
+    factor = 2,
+    jitter = true,
+    jitterFactor = 0.3,
+    isRetryable = isRetryableError,
+    onRetry,
+  } = options;
 
   let lastError: Error | null = null;
   let delay = initialDelay;
@@ -148,9 +319,23 @@ export async function retry<T>(
     } catch (error) {
       lastError = error as Error;
 
-      if (attempt < maxRetries) {
-        await sleep(delay);
+      // Check if we should retry this error
+      if (attempt < maxRetries && isRetryable(error)) {
+        // Calculate delay with optional jitter
+        const actualDelay = jitter ? addJitter(delay, jitterFactor) : delay;
+
+        // Fire onRetry callback if provided
+        if (onRetry) {
+          onRetry(error, attempt + 1, actualDelay);
+        }
+
+        await sleep(actualDelay);
+
+        // Exponential backoff for next iteration
         delay = Math.min(delay * factor, maxDelay);
+      } else if (attempt < maxRetries && !isRetryable(error)) {
+        // Non-retryable error, throw immediately
+        throw error;
       }
     }
   }

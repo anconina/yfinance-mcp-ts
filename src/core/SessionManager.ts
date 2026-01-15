@@ -1,6 +1,9 @@
 /**
  * SessionManager - Handles HTTP session initialization, browser impersonation,
  * consent page handling, and crumb (CSRF token) retrieval for Yahoo Finance API.
+ *
+ * Includes automatic retry with exponential backoff for handling rate limits
+ * and transient network errors.
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
@@ -8,14 +11,31 @@ import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar, Cookie } from 'tough-cookie';
 import * as cheerio from 'cheerio';
 import { getRandomBrowser, getBrowserHeadersAsRecord, BrowserHeaders } from '../config/browsers';
-import { SessionOptions } from '../types';
+import { SessionOptions, RetryConfig } from '../types';
 import { AuthCookie, HeadlessAuth } from '../auth/HeadlessAuth';
+import {
+  retry,
+  RetryOptions,
+  isRetryableError,
+  isRateLimitError,
+  isInvalidCrumbError,
+} from '../utils/helpers';
 
 // Constants
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const DEFAULT_SESSION_URL = 'https://finance.yahoo.com';
 const CRUMB_URL = 'https://query2.finance.yahoo.com/v1/test/getcrumb';
 const CONSENT_URL = 'https://consent.yahoo.com/v2/collectConsent';
+
+// Default retry configuration
+const DEFAULT_RETRY_CONFIG: Required<Omit<RetryConfig, 'onRetry'>> = {
+  enabled: true,
+  maxRetries: 3,
+  initialDelay: 1000,
+  maxDelay: 30000,
+  factor: 2,
+  jitter: true,
+};
 
 export class SessionManager {
   private client: AxiosInstance;
@@ -27,6 +47,8 @@ export class SessionManager {
   private isPremium = false;
   private username?: string;
   private password?: string;
+  private retryConfig: Required<Omit<RetryConfig, 'onRetry'>> & { onRetry?: RetryConfig['onRetry'] };
+  private crumbRefreshInProgress = false;
 
   constructor(options: SessionOptions = {}) {
     this.cookieJar = new CookieJar();
@@ -35,6 +57,12 @@ export class SessionManager {
     this.headers = headers;
     this.username = options.username;
     this.password = options.password;
+
+    // Merge retry configuration with defaults
+    this.retryConfig = {
+      ...DEFAULT_RETRY_CONFIG,
+      ...options.retry,
+    };
 
     // Create axios instance with cookie jar support
     this.client = wrapper(
@@ -233,7 +261,13 @@ export class SessionManager {
   }
 
   /**
-   * Make a GET request with automatic crumb injection
+   * Make a GET request with automatic crumb injection and retry on failure
+   *
+   * Automatically retries on:
+   * - Rate limit errors (HTTP 429)
+   * - Server errors (HTTP 5xx)
+   * - Network errors (ECONNRESET, ETIMEDOUT, etc.)
+   * - Invalid crumb errors (will refresh crumb and retry)
    */
   async get<T = unknown>(
     url: string,
@@ -243,6 +277,47 @@ export class SessionManager {
       await this.initialize();
     }
 
+    // If retry is disabled, make direct request
+    if (!this.retryConfig.enabled) {
+      return this.executeGet<T>(url, config);
+    }
+
+    // Build retry options
+    const retryOptions: RetryOptions = {
+      maxRetries: this.retryConfig.maxRetries,
+      initialDelay: this.retryConfig.initialDelay,
+      maxDelay: this.retryConfig.maxDelay,
+      factor: this.retryConfig.factor,
+      jitter: this.retryConfig.jitter,
+      isRetryable: (error) => this.isErrorRetryable(error),
+      onRetry: async (error, attempt, delay) => {
+        // Log retry attempt
+        if (this.retryConfig.onRetry) {
+          this.retryConfig.onRetry(error, attempt, delay);
+        }
+
+        // Handle invalid crumb - refresh before retry
+        if (isInvalidCrumbError(error)) {
+          await this.refreshCrumb();
+        }
+
+        // Log rate limit for debugging
+        if (isRateLimitError(error)) {
+          console.warn(`Rate limited. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
+        }
+      },
+    };
+
+    return retry(() => this.executeGet<T>(url, config), retryOptions);
+  }
+
+  /**
+   * Execute the actual GET request (internal method)
+   */
+  private async executeGet<T = unknown>(
+    url: string,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
     const params = {
       ...config?.params,
       ...(this.crumb && { crumb: this.crumb }),
@@ -261,7 +336,13 @@ export class SessionManager {
   }
 
   /**
-   * Make a POST request with automatic crumb injection
+   * Make a POST request with automatic crumb injection and retry on failure
+   *
+   * Automatically retries on:
+   * - Rate limit errors (HTTP 429)
+   * - Server errors (HTTP 5xx)
+   * - Network errors (ECONNRESET, ETIMEDOUT, etc.)
+   * - Invalid crumb errors (will refresh crumb and retry)
    */
   async post<T = unknown>(
     url: string,
@@ -272,6 +353,48 @@ export class SessionManager {
       await this.initialize();
     }
 
+    // If retry is disabled, make direct request
+    if (!this.retryConfig.enabled) {
+      return this.executePost<T>(url, data, config);
+    }
+
+    // Build retry options
+    const retryOptions: RetryOptions = {
+      maxRetries: this.retryConfig.maxRetries,
+      initialDelay: this.retryConfig.initialDelay,
+      maxDelay: this.retryConfig.maxDelay,
+      factor: this.retryConfig.factor,
+      jitter: this.retryConfig.jitter,
+      isRetryable: (error) => this.isErrorRetryable(error),
+      onRetry: async (error, attempt, delay) => {
+        // Log retry attempt
+        if (this.retryConfig.onRetry) {
+          this.retryConfig.onRetry(error, attempt, delay);
+        }
+
+        // Handle invalid crumb - refresh before retry
+        if (isInvalidCrumbError(error)) {
+          await this.refreshCrumb();
+        }
+
+        // Log rate limit for debugging
+        if (isRateLimitError(error)) {
+          console.warn(`Rate limited. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
+        }
+      },
+    };
+
+    return retry(() => this.executePost<T>(url, data, config), retryOptions);
+  }
+
+  /**
+   * Execute the actual POST request (internal method)
+   */
+  private async executePost<T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig
+  ): Promise<T> {
     const params = {
       ...config?.params,
       ...(this.crumb && { crumb: this.crumb }),
@@ -311,6 +434,66 @@ export class SessionManager {
    */
   async refresh(): Promise<void> {
     this.crumb = await this.getCrumb();
+  }
+
+  /**
+   * Check if an error is retryable
+   * Considers rate limits, network errors, server errors, and invalid crumb
+   */
+  private isErrorRetryable(error: unknown): boolean {
+    // Always retry rate limit errors
+    if (isRateLimitError(error)) {
+      return true;
+    }
+
+    // Retry invalid crumb errors (will refresh crumb before retry)
+    if (isInvalidCrumbError(error)) {
+      return true;
+    }
+
+    // Use the general retryable error checker for other errors
+    return isRetryableError(error);
+  }
+
+  /**
+   * Refresh the crumb token (thread-safe)
+   * Prevents multiple concurrent crumb refresh requests
+   */
+  private async refreshCrumb(): Promise<void> {
+    // Prevent multiple concurrent refresh attempts
+    if (this.crumbRefreshInProgress) {
+      // Wait a bit and hope the other refresh completes
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return;
+    }
+
+    this.crumbRefreshInProgress = true;
+    try {
+      console.warn('Refreshing crumb token...');
+      this.crumb = await this.getCrumb();
+      if (this.crumb) {
+        console.warn('Crumb token refreshed successfully');
+      }
+    } finally {
+      this.crumbRefreshInProgress = false;
+    }
+  }
+
+  /**
+   * Get the current retry configuration
+   */
+  getRetryConfig(): RetryConfig {
+    return { ...this.retryConfig };
+  }
+
+  /**
+   * Update retry configuration at runtime
+   */
+  setRetryConfig(config: Partial<RetryConfig>): void {
+    this.retryConfig = {
+      ...this.retryConfig,
+      ...config,
+    };
   }
 }
 

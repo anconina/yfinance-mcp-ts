@@ -17,6 +17,23 @@ export interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+export interface RetryConfig {
+  /** Enable automatic retry with exponential backoff (default: true) */
+  enabled?: boolean;
+  /** Maximum number of retry attempts (default: 3) */
+  maxRetries?: number;
+  /** Initial delay in milliseconds before first retry (default: 1000) */
+  initialDelay?: number;
+  /** Maximum delay in milliseconds between retries (default: 30000) */
+  maxDelay?: number;
+  /** Multiplier for exponential backoff (default: 2) */
+  factor?: number;
+  /** Add random jitter to delays to prevent thundering herd (default: true) */
+  jitter?: boolean;
+  /** Callback fired before each retry attempt */
+  onRetry?: (error: unknown, attempt: number, delay: number) => void;
+}
+
 export interface SessionOptions {
   timeout?: number;
   maxWorkers?: number;
@@ -25,6 +42,8 @@ export interface SessionOptions {
   proxies?: Record<string, string>;
   username?: string;
   password?: string;
+  /** Retry configuration for handling rate limits and transient errors */
+  retry?: RetryConfig;
 }
 
 export interface BaseFinanceOptions extends SessionOptions {
