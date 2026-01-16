@@ -19,6 +19,7 @@ import {
   isRetryableError,
   isRateLimitError,
   isInvalidCrumbError,
+  getRetryAfterMs,
 } from '../utils/helpers';
 import { ProxyManager, ProxyConfig } from './ProxyManager';
 
@@ -29,11 +30,12 @@ const CRUMB_URL = 'https://query2.finance.yahoo.com/v1/test/getcrumb';
 const CONSENT_URL = 'https://consent.yahoo.com/v2/collectConsent';
 
 // Default retry configuration
+// P1 Recommendation: Increased parameters for better rate limit handling
 const DEFAULT_RETRY_CONFIG: Required<Omit<RetryConfig, 'onRetry'>> = {
   enabled: true,
-  maxRetries: 3,
-  initialDelay: 1000,
-  maxDelay: 30000,
+  maxRetries: 5,        // Increased from 3 for better resilience
+  initialDelay: 2000,   // Increased from 1000ms to be more conservative
+  maxDelay: 60000,      // Increased from 30000ms (1 minute max)
   factor: 2,
   jitter: true,
 };
@@ -302,6 +304,8 @@ export class SessionManager {
       factor: this.retryConfig.factor,
       jitter: this.retryConfig.jitter,
       isRetryable: (error) => this.isErrorRetryable(error),
+      // P1 Recommendation: Use Retry-After header when available
+      getDelayFromError: (error) => getRetryAfterMs(error),
       onRetry: async (error, attempt, delay) => {
         // Log retry attempt
         if (this.retryConfig.onRetry) {
@@ -313,9 +317,11 @@ export class SessionManager {
           await this.refreshCrumb();
         }
 
-        // Log rate limit for debugging
+        // Log rate limit for debugging with Retry-After info
         if (isRateLimitError(error)) {
-          console.warn(`Rate limited. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
+          const retryAfter = getRetryAfterMs(error);
+          const retryInfo = retryAfter ? ` (Retry-After: ${retryAfter}ms)` : '';
+          console.warn(`Rate limited${retryInfo}. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
         }
       },
     };
@@ -402,6 +408,8 @@ export class SessionManager {
       factor: this.retryConfig.factor,
       jitter: this.retryConfig.jitter,
       isRetryable: (error) => this.isErrorRetryable(error),
+      // P1 Recommendation: Use Retry-After header when available
+      getDelayFromError: (error) => getRetryAfterMs(error),
       onRetry: async (error, attempt, delay) => {
         // Log retry attempt
         if (this.retryConfig.onRetry) {
@@ -413,9 +421,11 @@ export class SessionManager {
           await this.refreshCrumb();
         }
 
-        // Log rate limit for debugging
+        // Log rate limit for debugging with Retry-After info
         if (isRateLimitError(error)) {
-          console.warn(`Rate limited. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
+          const retryAfter = getRetryAfterMs(error);
+          const retryInfo = retryAfter ? ` (Retry-After: ${retryAfter}ms)` : '';
+          console.warn(`Rate limited${retryInfo}. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
         }
       },
     };

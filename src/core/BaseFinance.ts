@@ -6,7 +6,7 @@
 
 import { SessionManager } from './SessionManager';
 import { CONFIG, EndpointConfig } from '../config/endpoints';
-import { COUNTRIES, CountryConfig, getCountryConfig } from '../config/countries';
+import { CountryConfig, getCountryConfig } from '../config/countries';
 import { MODULES_DICT } from '../config/modules';
 import {
   convertToList,
@@ -14,11 +14,16 @@ import {
   formatTimestamp,
   stringifyBooleans,
   chunkArray,
+  sleep,
+  addJitter,
 } from '../utils/helpers';
 import { BaseFinanceOptions, QueryParams } from '../types';
 
 // Maximum symbols per request chunk
 const CHUNK_SIZE = 1500;
+
+// Default inter-request delay in milliseconds (P1 Recommendation)
+const DEFAULT_REQUEST_DELAY = 100;
 
 export abstract class BaseFinance {
   protected _symbols: string[] = [];
@@ -29,13 +34,42 @@ export abstract class BaseFinance {
   protected session: SessionManager;
   protected crumb: string | null = null;
   protected initialized = false;
+  /** Minimum delay between sequential requests (ms) to avoid rate limiting */
+  protected requestDelay: number;
+  /** Timestamp of the last request made */
+  private lastRequestTime: number = 0;
 
   constructor(options: BaseFinanceOptions = {}) {
     this._country = (options.country ?? 'united states').toLowerCase();
     this._countryParams = getCountryConfig(this._country);
     this.formatted = options.formatted ?? false;
     this.progress = options.progress ?? false;
+    this.requestDelay = options.requestDelay ?? DEFAULT_REQUEST_DELAY;
     this.session = new SessionManager(options);
+  }
+
+  /**
+   * Apply inter-request delay to avoid rate limiting (P1 Recommendation)
+   * Ensures minimum time between sequential requests with jitter
+   */
+  private async applyRequestDelay(): Promise<void> {
+    if (this.requestDelay <= 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    const requiredDelay = this.requestDelay;
+
+    if (timeSinceLastRequest < requiredDelay) {
+      // Calculate remaining delay needed
+      const remainingDelay = requiredDelay - timeSinceLastRequest;
+      // Add jitter (±50%) to prevent pattern detection
+      const delayWithJitter = addJitter(remainingDelay, 0.5);
+      await sleep(delayWithJitter);
+    }
+
+    this.lastRequestTime = Date.now();
   }
 
   /**
@@ -190,6 +224,7 @@ export abstract class BaseFinance {
 
   /**
    * Execute multiple concurrent requests (one per symbol)
+   * P1 Recommendation: Added inter-request delay to avoid rate limiting
    */
   private async executeMultipleRequests<T>(
     config: EndpointConfig,
@@ -211,6 +246,8 @@ export abstract class BaseFinance {
         const url = config.path.replace('{symbol}', symbol);
 
         try {
+          // Apply inter-request delay before each request
+          await this.applyRequestDelay();
           const response = await this.session.get<unknown>(url, { params });
           const validated = this.validateResponse(response, responseField);
           const data = this.constructData<T>(validated, responseField, options);
@@ -241,6 +278,7 @@ export abstract class BaseFinance {
 
   /**
    * Execute a single request
+   * P1 Recommendation: Added inter-request delay to avoid rate limiting
    */
   private async executeSingleRequest<T>(
     config: EndpointConfig,
@@ -254,6 +292,9 @@ export abstract class BaseFinance {
     }
   ): Promise<Record<string, T>> {
     const url = config.path;
+
+    // Apply inter-request delay before the request
+    await this.applyRequestDelay();
 
     const response =
       options.method === 'post'

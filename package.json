@@ -1,6 +1,6 @@
 {
   "name": "yfinance-mcp-ts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "TypeScript wrapper for unofficial Yahoo Finance API - stocks, options, financials, screeners, and more. Includes MCP server for AI agents.",
   "main": "dist/index.js",
   "module": "dist/index.js",

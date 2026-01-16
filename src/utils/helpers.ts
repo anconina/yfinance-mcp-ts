@@ -155,6 +155,59 @@ export interface RetryOptions {
   isRetryable?: (error: unknown) => boolean;
   /** Callback fired before each retry attempt */
   onRetry?: (error: unknown, attempt: number, delay: number) => void;
+  /**
+   * Function to get a custom delay for a specific error (e.g., from Retry-After header)
+   * If this returns a non-null value, it overrides the calculated exponential backoff delay
+   * The returned value is still subject to maxDelay capping
+   */
+  getDelayFromError?: (error: unknown) => number | null;
+}
+
+/**
+ * Extract the Retry-After value from an error response in milliseconds
+ * The Retry-After header can be either a number of seconds or an HTTP date
+ * @param error - The error object (typically an Axios error)
+ * @returns The retry delay in milliseconds, or null if not found
+ */
+export function getRetryAfterMs(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null;
+
+  const err = error as {
+    response?: {
+      headers?: Record<string, string | string[] | undefined>;
+    };
+  };
+
+  // Try to get Retry-After header (case-insensitive)
+  const headers = err.response?.headers;
+  if (!headers) return null;
+
+  // Headers might be lowercase or mixed case depending on the HTTP library
+  const retryAfter =
+    headers['retry-after'] ??
+    headers['Retry-After'] ??
+    headers['RETRY-AFTER'];
+
+  if (!retryAfter) return null;
+
+  // Handle array format (some HTTP libraries return headers as arrays)
+  const value = Array.isArray(retryAfter) ? retryAfter[0] : retryAfter;
+  if (!value) return null;
+
+  // Try to parse as number of seconds
+  const seconds = parseInt(value, 10);
+  if (!isNaN(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  // Try to parse as HTTP date (e.g., "Wed, 21 Oct 2025 07:28:00 GMT")
+  const date = new Date(value);
+  if (!isNaN(date.getTime())) {
+    const delay = date.getTime() - Date.now();
+    return Math.max(0, delay);
+  }
+
+  return null;
 }
 
 /**
@@ -308,6 +361,7 @@ export async function retry<T>(
     jitterFactor = 0.3,
     isRetryable = isRetryableError,
     onRetry,
+    getDelayFromError,
   } = options;
 
   let lastError: Error | null = null;
@@ -321,8 +375,16 @@ export async function retry<T>(
 
       // Check if we should retry this error
       if (attempt < maxRetries && isRetryable(error)) {
-        // Calculate delay with optional jitter
-        const actualDelay = jitter ? addJitter(delay, jitterFactor) : delay;
+        // Check if we have a custom delay from the error (e.g., Retry-After header)
+        let baseDelay = delay;
+        const errorDelay = getDelayFromError?.(error);
+        if (errorDelay !== null && errorDelay !== undefined && errorDelay > 0) {
+          // Use the error-specified delay, but cap it at maxDelay
+          baseDelay = Math.min(errorDelay, maxDelay);
+        }
+
+        // Calculate final delay with optional jitter
+        const actualDelay = jitter ? addJitter(baseDelay, jitterFactor) : baseDelay;
 
         // Fire onRetry callback if provided
         if (onRetry) {
@@ -331,8 +393,14 @@ export async function retry<T>(
 
         await sleep(actualDelay);
 
-        // Exponential backoff for next iteration
-        delay = Math.min(delay * factor, maxDelay);
+        // Exponential backoff for next iteration (only if we didn't use error-specified delay)
+        if (errorDelay === null || errorDelay === undefined) {
+          delay = Math.min(delay * factor, maxDelay);
+        } else {
+          // If we used error-specified delay, still increase for next attempt
+          // in case the server sends another 429 without Retry-After
+          delay = Math.min(baseDelay * factor, maxDelay);
+        }
       } else if (attempt < maxRetries && !isRetryable(error)) {
         // Non-retryable error, throw immediately
         throw error;

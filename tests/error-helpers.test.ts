@@ -8,6 +8,7 @@ import {
   isInvalidCrumbError,
   retry,
   addJitter,
+  getRetryAfterMs,
 } from '../src/utils/helpers';
 
 describe('Error Helper Functions', () => {
@@ -309,6 +310,252 @@ describe('Error Helper Functions', () => {
       ).rejects.toThrow('non-retryable');
 
       expect(fn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getRetryAfterMs', () => {
+    test('should return null for null/undefined', () => {
+      expect(getRetryAfterMs(null)).toBeNull();
+      expect(getRetryAfterMs(undefined)).toBeNull();
+    });
+
+    test('should return null for non-object', () => {
+      expect(getRetryAfterMs('error')).toBeNull();
+      expect(getRetryAfterMs(123)).toBeNull();
+    });
+
+    test('should return null when no response', () => {
+      expect(getRetryAfterMs({})).toBeNull();
+      expect(getRetryAfterMs({ message: 'error' })).toBeNull();
+    });
+
+    test('should return null when no headers', () => {
+      expect(getRetryAfterMs({ response: {} })).toBeNull();
+      expect(getRetryAfterMs({ response: { status: 429 } })).toBeNull();
+    });
+
+    test('should return null when no Retry-After header', () => {
+      const error = {
+        response: {
+          headers: {
+            'content-type': 'application/json',
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBeNull();
+    });
+
+    test('should parse Retry-After as seconds (lowercase header)', () => {
+      const error = {
+        response: {
+          headers: {
+            'retry-after': '60',
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBe(60000); // 60 seconds in ms
+    });
+
+    test('should parse Retry-After as seconds (mixed case header)', () => {
+      const error = {
+        response: {
+          headers: {
+            'Retry-After': '120',
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBe(120000); // 120 seconds in ms
+    });
+
+    test('should parse Retry-After as seconds (uppercase header)', () => {
+      const error = {
+        response: {
+          headers: {
+            'RETRY-AFTER': '30',
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBe(30000); // 30 seconds in ms
+    });
+
+    test('should handle array header values', () => {
+      const error = {
+        response: {
+          headers: {
+            'retry-after': ['45'],
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBe(45000); // 45 seconds in ms
+    });
+
+    test('should parse Retry-After as HTTP date', () => {
+      const futureDate = new Date(Date.now() + 30000); // 30 seconds from now
+      const error = {
+        response: {
+          headers: {
+            'retry-after': futureDate.toUTCString(),
+          },
+        },
+      };
+      const result = getRetryAfterMs(error);
+      expect(result).not.toBeNull();
+      // Allow 1 second tolerance for timing
+      expect(result).toBeGreaterThanOrEqual(29000);
+      expect(result).toBeLessThanOrEqual(31000);
+    });
+
+    test('should return 0 for past HTTP date', () => {
+      const pastDate = new Date(Date.now() - 30000); // 30 seconds ago
+      const error = {
+        response: {
+          headers: {
+            'retry-after': pastDate.toUTCString(),
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBe(0);
+    });
+
+    test('should return null for invalid Retry-After value', () => {
+      const error = {
+        response: {
+          headers: {
+            'retry-after': 'invalid-value',
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBeNull();
+    });
+
+    test('should handle 0 seconds', () => {
+      const error = {
+        response: {
+          headers: {
+            'retry-after': '0',
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBe(0);
+    });
+
+    test('should handle empty array header', () => {
+      const error = {
+        response: {
+          headers: {
+            'retry-after': [],
+          },
+        },
+      };
+      expect(getRetryAfterMs(error)).toBeNull();
+    });
+  });
+
+  describe('retry with getDelayFromError', () => {
+    test('should use delay from getDelayFromError when provided', async () => {
+      const startTime = Date.now();
+      const fn = jest.fn()
+        .mockRejectedValueOnce({ retryAfter: 100 })
+        .mockResolvedValue('success');
+
+      await retry(fn, {
+        maxRetries: 2,
+        initialDelay: 1000, // Would normally wait 1000ms
+        jitter: false,
+        isRetryable: () => true,
+        getDelayFromError: (error: unknown) => (error as { retryAfter: number }).retryAfter,
+      });
+
+      const elapsed = Date.now() - startTime;
+      // Should use 100ms from getDelayFromError, not 1000ms initialDelay
+      expect(elapsed).toBeLessThan(500);
+    });
+
+    test('should use exponential backoff when getDelayFromError returns null', async () => {
+      const fn = jest.fn()
+        .mockRejectedValueOnce(new Error('fail'))
+        .mockResolvedValue('success');
+
+      const onRetry = jest.fn();
+
+      await retry(fn, {
+        maxRetries: 2,
+        initialDelay: 50,
+        jitter: false,
+        isRetryable: () => true,
+        getDelayFromError: () => null,
+        onRetry,
+      });
+
+      expect(onRetry).toHaveBeenCalledWith(expect.any(Error), 1, 50);
+    });
+
+    test('should cap delay from getDelayFromError at maxDelay', async () => {
+      const fn = jest.fn()
+        .mockRejectedValueOnce({ retryAfter: 10000 })
+        .mockResolvedValue('success');
+
+      const onRetry = jest.fn();
+
+      await retry(fn, {
+        maxRetries: 2,
+        initialDelay: 10,
+        maxDelay: 100, // Cap at 100ms
+        jitter: false,
+        isRetryable: () => true,
+        getDelayFromError: (error: unknown) => (error as { retryAfter: number }).retryAfter,
+        onRetry,
+      });
+
+      // Should be capped at 100ms
+      expect(onRetry).toHaveBeenCalledWith(expect.any(Object), 1, 100);
+    });
+
+    test('should ignore negative delay from getDelayFromError', async () => {
+      const fn = jest.fn()
+        .mockRejectedValueOnce({ retryAfter: -100 })
+        .mockResolvedValue('success');
+
+      const onRetry = jest.fn();
+
+      await retry(fn, {
+        maxRetries: 2,
+        initialDelay: 50,
+        jitter: false,
+        isRetryable: () => true,
+        getDelayFromError: (error: unknown) => (error as { retryAfter: number }).retryAfter,
+        onRetry,
+      });
+
+      // Should use initialDelay since getDelayFromError returned negative
+      expect(onRetry).toHaveBeenCalledWith(expect.any(Object), 1, 50);
+    });
+
+    test('should work with getRetryAfterMs helper', async () => {
+      const fn = jest.fn()
+        .mockRejectedValueOnce({
+          response: {
+            headers: {
+              'retry-after': '1', // 1 second
+            },
+          },
+        })
+        .mockResolvedValue('success');
+
+      const onRetry = jest.fn();
+
+      await retry(fn, {
+        maxRetries: 2,
+        initialDelay: 100,
+        maxDelay: 5000,
+        jitter: false,
+        isRetryable: () => true,
+        getDelayFromError: getRetryAfterMs,
+        onRetry,
+      });
+
+      // Should use 1000ms from Retry-After header
+      expect(onRetry).toHaveBeenCalledWith(expect.any(Object), 1, 1000);
     });
   });
 });

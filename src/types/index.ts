@@ -73,6 +73,13 @@ export interface BaseFinanceOptions extends SessionOptions {
   progress?: boolean;
   username?: string;
   password?: string;
+  /**
+   * Minimum delay in milliseconds between sequential API requests.
+   * Helps avoid rate limiting by spacing out requests.
+   * A random jitter of ±50% is added to prevent pattern detection.
+   * Default: 100ms. Set to 0 to disable.
+   */
+  requestDelay?: number;
 }
 
 export interface TickerOptions extends BaseFinanceOptions {
