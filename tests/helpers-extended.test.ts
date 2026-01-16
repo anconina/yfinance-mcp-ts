@@ -78,7 +78,8 @@ describe('Helpers - Extended Coverage', () => {
         .mockRejectedValueOnce(new Error('fail 1'))
         .mockResolvedValue('success');
 
-      const result = await retry(fn, { maxRetries: 3, initialDelay: 10 });
+      // Pass isRetryable to make all errors retryable for this test
+      const result = await retry(fn, { maxRetries: 3, initialDelay: 10, isRetryable: () => true });
       expect(result).toBe('success');
       expect(fn).toHaveBeenCalledTimes(2);
     });
@@ -86,7 +87,8 @@ describe('Helpers - Extended Coverage', () => {
     test('should throw after max retries', async () => {
       const fn = jest.fn().mockRejectedValue(new Error('always fails'));
 
-      await expect(retry(fn, { maxRetries: 2, initialDelay: 10 })).rejects.toThrow('always fails');
+      // Pass isRetryable to make all errors retryable for this test
+      await expect(retry(fn, { maxRetries: 2, initialDelay: 10, isRetryable: () => true })).rejects.toThrow('always fails');
       expect(fn).toHaveBeenCalledTimes(3); // Initial + 2 retries
     });
 
@@ -97,10 +99,11 @@ describe('Helpers - Extended Coverage', () => {
         .mockResolvedValue('success');
 
       const start = Date.now();
-      await retry(fn, { maxRetries: 3, initialDelay: 20, factor: 2 });
+      // Pass isRetryable and disable jitter for predictable timing
+      await retry(fn, { maxRetries: 3, initialDelay: 20, factor: 2, jitter: false, isRetryable: () => true });
       const elapsed = Date.now() - start;
 
-      // Should have waited at least initialDelay + initialDelay*factor
+      // Should have waited at least initialDelay + initialDelay*factor (20 + 40 = 60ms)
       expect(elapsed).toBeGreaterThanOrEqual(50);
     });
 
@@ -109,7 +112,8 @@ describe('Helpers - Extended Coverage', () => {
         .mockRejectedValueOnce(new Error('fail'))
         .mockResolvedValue('success');
 
-      await retry(fn, { maxRetries: 1, initialDelay: 10, maxDelay: 10, factor: 10 });
+      // Pass isRetryable to make all errors retryable for this test
+      await retry(fn, { maxRetries: 1, initialDelay: 10, maxDelay: 10, factor: 10, isRetryable: () => true });
       expect(fn).toHaveBeenCalledTimes(2);
     });
   });
