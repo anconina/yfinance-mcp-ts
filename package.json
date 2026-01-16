@@ -42,15 +42,15 @@
     "ai-agent",
     "claude"
   ],
-  "author": "",
+  "author": "anconina",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dpguthrie/yahooquery.git"
+    "url": "git+https://github.com/anconina/yfinance-mcp-ts.git"
   },
-  "homepage": "https://github.com/dpguthrie/yahooquery#readme",
+  "homepage": "https://github.com/anconina/yfinance-mcp-ts#readme",
   "bugs": {
-    "url": "https://github.com/dpguthrie/yahooquery/issues"
+    "url": "https://github.com/anconina/yfinance-mcp-ts/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
