@@ -13,6 +13,8 @@ A TypeScript wrapper for the unofficial Yahoo Finance API. This library provides
 - **Search**: Search for stocks, ETFs, mutual funds, and more
 - **Premium Support**: Optional Yahoo Finance Premium authentication
 - **MCP Server**: Built-in Model Context Protocol server for AI agents (Claude, etc.)
+- **Proxy Rotation**: Distribute requests across multiple proxies with automatic failure tracking
+- **Retry with Backoff**: Automatic retry with exponential backoff for rate limits and transient errors
 
 ## MCP Server (AI Agent Integration)
 
@@ -45,6 +47,39 @@ Or if installed locally:
   }
 }
 ```
+
+### MCP Server with Proxy Rotation
+
+To use proxy rotation with the MCP server, configure environment variables:
+
+```json
+{
+  "mcpServers": {
+    "yfinance": {
+      "command": "node",
+      "args": ["/path/to/yfinance-mcp-ts/dist/mcp/server.js"],
+      "env": {
+        "YFINANCE_PROXY_LIST": "http://user:pass@proxy1.com:8080\nhttp://user:pass@proxy2.com:8080",
+        "YFINANCE_PROXY_MAX_FAILURES": "3",
+        "YFINANCE_PROXY_COOLDOWN_MS": "300000"
+      }
+    }
+  }
+}
+```
+
+#### MCP Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `YFINANCE_PROXY_LIST` | Newline-separated proxy URLs | - |
+| `YFINANCE_PROXY_MAX_FAILURES` | Failures before marking proxy unhealthy | 3 |
+| `YFINANCE_PROXY_COOLDOWN_MS` | Cooldown before retrying unhealthy proxy | 300000 |
+| `YFINANCE_RETRY_ENABLED` | Enable automatic retry | true |
+| `YFINANCE_RETRY_MAX_RETRIES` | Maximum retry attempts | 3 |
+| `YFINANCE_RETRY_INITIAL_DELAY` | Initial retry delay (ms) | 1000 |
+| `YFINANCE_RETRY_MAX_DELAY` | Maximum retry delay (ms) | 30000 |
+| `YFINANCE_TIMEOUT` | Request timeout (ms) | 30000 |
 
 ### Available MCP Tools (20 tools)
 
@@ -162,6 +197,23 @@ interface TickerOptions {
   username?: string;       // Yahoo username for premium
   password?: string;       // Yahoo password for premium
   timeout?: number;        // Request timeout in ms (default: 30000)
+
+  // Retry configuration
+  retry?: {
+    enabled?: boolean;      // Enable automatic retry (default: true)
+    maxRetries?: number;    // Max retry attempts (default: 3)
+    initialDelay?: number;  // Initial delay in ms (default: 1000)
+    maxDelay?: number;      // Max delay in ms (default: 30000)
+    factor?: number;        // Exponential backoff factor (default: 2)
+    jitter?: boolean;       // Add random jitter (default: true)
+  };
+
+  // Proxy rotation configuration
+  proxyRotation?: {
+    proxyList?: string;     // Newline-separated proxy URLs
+    maxFailures?: number;   // Failures before unhealthy (default: 3)
+    cooldownMs?: number;    // Cooldown period in ms (default: 300000)
+  };
 }
 ```
 
@@ -364,6 +416,62 @@ const countries = getValidCountries();
 // ['united states', 'france', 'germany', 'united kingdom', ...]
 ```
 
+### Proxy Rotation
+
+Distribute requests across multiple proxies to avoid rate limits and IP blocks. The ProxyManager automatically rotates through proxies and tracks failures.
+
+```typescript
+import { Ticker, createSession } from 'yfinance-mcp-ts';
+
+// Option 1: Configure via Ticker options
+const ticker = new Ticker('AAPL', {
+  proxyRotation: {
+    proxyList: `
+      http://user:pass@proxy1.example.com:8080
+      http://user:pass@proxy2.example.com:8080
+      socks5://proxy3.example.com:1080
+    `,
+    maxFailures: 3,      // Mark unhealthy after 3 failures
+    cooldownMs: 300000,  // 5 min cooldown before retry
+  },
+});
+
+// Option 2: Create session with proxies
+const session = await createSession({
+  proxyRotation: {
+    proxyList: process.env.PROXY_LIST || '',
+  },
+});
+
+// Check proxy status
+console.log('Proxy rotation enabled:', session.hasProxyRotation());
+console.log('Proxy stats:', session.getProxyStats());
+```
+
+#### Supported Proxy Formats
+
+```
+http://host:port                    # HTTP proxy without auth
+http://username:password@host:port  # HTTP proxy with auth
+https://host:port                   # HTTPS proxy
+socks5://username:password@host:port # SOCKS5 proxy
+```
+
+#### Proxy Rotation Features
+
+- **Round-robin rotation**: Automatically cycles through available proxies
+- **Failure tracking**: Marks proxies as unhealthy after consecutive failures
+- **Automatic recovery**: Unhealthy proxies are retried after cooldown period
+- **Statistics**: Monitor proxy health and success rates
+
+#### Required Dependencies
+
+For proxy support, install the optional dependencies:
+
+```bash
+npm install https-proxy-agent socks-proxy-agent
+```
+
 ### Premium Features
 
 For Yahoo Finance Premium subscribers:
@@ -482,12 +590,21 @@ Full TypeScript support with exported types:
 
 ```typescript
 import {
+  // Classes
   Ticker,
+  Screener,
+  Research,
+  SessionManager,
+  ProxyManager,
+
+  // Types
   TickerOptions,
   HistoryParams,
   SessionOptions,
+  RetryConfig,
+  ProxyRotationConfig,
+  ProxyConfig,
   SearchResult,
-  ScreenerResult,
   AuthCookie,
 } from 'yfinance-mcp-ts';
 ```

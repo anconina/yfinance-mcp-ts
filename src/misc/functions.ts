@@ -6,6 +6,7 @@
 
 import { SessionManager } from '../core/SessionManager';
 import { COUNTRIES, getCountryConfig } from '../config/countries';
+import { SessionOptions } from '../types';
 
 const BASE_URL = 'https://query2.finance.yahoo.com';
 
@@ -74,6 +75,8 @@ export interface SearchOptions {
   quotesCount?: number;
   newsCount?: number;
   firstQuote?: boolean;
+  /** Session options including proxy rotation config */
+  sessionOptions?: SessionOptions;
 }
 
 /**
@@ -92,9 +95,10 @@ export async function search(
     quotesCount = 10,
     newsCount = 10,
     firstQuote = false,
+    sessionOptions = {},
   } = options;
 
-  const session = new SessionManager();
+  const session = new SessionManager(sessionOptions);
   await session.initialize();
 
   const countryParams = getCountryConfig(country.toLowerCase());
@@ -121,10 +125,11 @@ export async function search(
 /**
  * Get a list of available currencies
  *
+ * @param sessionOptions - Optional session options including proxy rotation
  * @returns Array of currency objects
  */
-export async function getCurrencies(): Promise<Currency[]> {
-  const session = new SessionManager();
+export async function getCurrencies(sessionOptions?: SessionOptions): Promise<Currency[]> {
+  const session = new SessionManager(sessionOptions);
   await session.initialize();
 
   const response = await session.get<{ currencies: { result: Currency[] } }>(
@@ -138,12 +143,14 @@ export async function getCurrencies(): Promise<Currency[]> {
  * Get a market summary for a specific region
  *
  * @param country - Country name (default: 'united states')
+ * @param sessionOptions - Optional session options including proxy rotation
  * @returns Array of market summary items (major indices, etc.)
  */
 export async function getMarketSummary(
-  country = 'united states'
+  country = 'united states',
+  sessionOptions?: SessionOptions
 ): Promise<MarketSummaryItem[]> {
-  const session = new SessionManager();
+  const session = new SessionManager(sessionOptions);
   await session.initialize();
 
   const countryParams = getCountryConfig(country.toLowerCase());
@@ -162,15 +169,17 @@ export async function getMarketSummary(
  * Get trending stocks for a specific region
  *
  * @param country - Country name (default: 'united states')
+ * @param sessionOptions - Optional session options including proxy rotation
  * @returns Trending stocks result
  */
 export async function getTrending(
-  country = 'united states'
+  country = 'united states',
+  sessionOptions?: SessionOptions
 ): Promise<TrendingResult | null> {
   const countryParams = getCountryConfig(country.toLowerCase());
   const region = countryParams.region;
 
-  const session = new SessionManager();
+  const session = new SessionManager(sessionOptions);
   await session.initialize();
 
   const response = await session.get<{ finance: { result: TrendingResult[] } }>(

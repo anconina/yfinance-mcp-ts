@@ -34,16 +34,37 @@ export interface RetryConfig {
   onRetry?: (error: unknown, attempt: number, delay: number) => void;
 }
 
+/**
+ * Proxy configuration for rotating proxies
+ */
+export interface ProxyRotationConfig {
+  /**
+   * Newline-separated list of proxy URLs
+   * Format: protocol://user:pass@host:port or protocol://host:port
+   * Example:
+   * http://user:pass@proxy1.example.com:8080
+   * socks5://proxy2.example.com:1080
+   */
+  proxyList?: string;
+  /** Maximum consecutive failures before marking proxy as unhealthy (default: 3) */
+  maxFailures?: number;
+  /** Cooldown period in ms before retrying a failed proxy (default: 300000 = 5 min) */
+  cooldownMs?: number;
+}
+
 export interface SessionOptions {
   timeout?: number;
   maxWorkers?: number;
   asynchronous?: boolean;
   verify?: boolean;
+  /** @deprecated Use proxyRotation for rotating proxies */
   proxies?: Record<string, string>;
   username?: string;
   password?: string;
   /** Retry configuration for handling rate limits and transient errors */
   retry?: RetryConfig;
+  /** Proxy rotation configuration for distributing requests across multiple IPs */
+  proxyRotation?: ProxyRotationConfig;
 }
 
 export interface BaseFinanceOptions extends SessionOptions {

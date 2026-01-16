@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { Research } from '../../core/Research';
+import { getMcpSessionOptions } from '../config';
 
 // Schema definitions
 export const getEarningsCalendarSchema = z.object({
@@ -37,7 +38,7 @@ function getDefaultDateRange(startOffset = 0, endOffset = 7): { start: string; e
 // Tool implementations
 export async function getEarningsCalendar(args: z.infer<typeof getEarningsCalendarSchema>): Promise<string> {
   try {
-    const research = new Research();
+    const research = new Research(getMcpSessionOptions());
     const defaults = getDefaultDateRange(0, 7);
     const data = await research.getEarnings(args.start || defaults.start, args.end || defaults.end);
     return JSON.stringify(data, null, 2);
@@ -48,7 +49,7 @@ export async function getEarningsCalendar(args: z.infer<typeof getEarningsCalend
 
 export async function getIPOs(args: z.infer<typeof getIPOsSchema>): Promise<string> {
   try {
-    const research = new Research();
+    const research = new Research(getMcpSessionOptions());
     const defaults = getDefaultDateRange(-30, 30);
     const data = await research.getIPOs(args.start || defaults.start, args.end || defaults.end);
     return JSON.stringify(data, null, 2);
@@ -59,7 +60,7 @@ export async function getIPOs(args: z.infer<typeof getIPOsSchema>): Promise<stri
 
 export async function getSplits(args: z.infer<typeof getSplitsSchema>): Promise<string> {
   try {
-    const research = new Research();
+    const research = new Research(getMcpSessionOptions());
     const defaults = getDefaultDateRange(-30, 30);
     const data = await research.getSplits(args.start || defaults.start, args.end || defaults.end);
     return JSON.stringify(data, null, 2);

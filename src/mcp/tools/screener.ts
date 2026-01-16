@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { Screener } from '../../core/Screener';
+import { getMcpSessionOptions } from '../config';
 
 // Schema definitions
 export const listScreenersSchema = z.object({});
@@ -20,7 +21,7 @@ export const getScreenerInfoSchema = z.object({
 // Tool implementations
 export async function listScreeners(): Promise<string> {
   try {
-    const screener = new Screener();
+    const screener = new Screener(getMcpSessionOptions());
     const available = screener.availableScreeners;
 
     // Group screeners by category for better readability
@@ -43,7 +44,7 @@ export async function listScreeners(): Promise<string> {
 
 export async function getScreener(args: z.infer<typeof getScreenerSchema>): Promise<string> {
   try {
-    const screener = new Screener();
+    const screener = new Screener(getMcpSessionOptions());
     const data = await screener.getScreeners(args.screener, args.count || 25);
     return JSON.stringify(data, null, 2);
   } catch (error) {
@@ -53,7 +54,7 @@ export async function getScreener(args: z.infer<typeof getScreenerSchema>): Prom
 
 export async function getScreenerInfo(args: z.infer<typeof getScreenerInfoSchema>): Promise<string> {
   try {
-    const screener = new Screener();
+    const screener = new Screener(getMcpSessionOptions());
     const info = screener.getScreenerInfo(args.screener);
 
     if (!info) {

@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { search, getMarketSummary, getTrending, getCurrencies, getValidCountries } from '../../misc/functions';
+import { getMcpSessionOptions } from '../config';
 
 // Schema definitions
 export const searchStocksSchema = z.object({
@@ -27,7 +28,10 @@ export const getCountriesSchema = z.object({});
 // Tool implementations
 export async function searchStocks(args: z.infer<typeof searchStocksSchema>): Promise<string> {
   try {
-    const results = await search(args.query, { quotesCount: args.limit || 10 });
+    const results = await search(args.query, {
+      quotesCount: args.limit || 10,
+      sessionOptions: getMcpSessionOptions(),
+    });
     return JSON.stringify(results, null, 2);
   } catch (error) {
     throw new Error(`Failed to search stocks: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -36,7 +40,7 @@ export async function searchStocks(args: z.infer<typeof searchStocksSchema>): Pr
 
 export async function marketSummary(args: z.infer<typeof getMarketSummarySchema>): Promise<string> {
   try {
-    const data = await getMarketSummary(args.country || 'united states');
+    const data = await getMarketSummary(args.country || 'united states', getMcpSessionOptions());
     return JSON.stringify(data, null, 2);
   } catch (error) {
     throw new Error(`Failed to get market summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -45,7 +49,7 @@ export async function marketSummary(args: z.infer<typeof getMarketSummarySchema>
 
 export async function trending(args: z.infer<typeof getTrendingSchema>): Promise<string> {
   try {
-    const data = await getTrending(args.country || 'united states');
+    const data = await getTrending(args.country || 'united states', getMcpSessionOptions());
     // Limit results if count is specified
     if (data && args.count && Array.isArray(data.quotes)) {
       data.quotes = data.quotes.slice(0, args.count);
@@ -58,7 +62,7 @@ export async function trending(args: z.infer<typeof getTrendingSchema>): Promise
 
 export async function currencies(): Promise<string> {
   try {
-    const data = await getCurrencies();
+    const data = await getCurrencies(getMcpSessionOptions());
     return JSON.stringify(data, null, 2);
   } catch (error) {
     throw new Error(`Failed to get currencies: ${error instanceof Error ? error.message : 'Unknown error'}`);

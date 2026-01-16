@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { Ticker } from '../../core/Ticker';
+import { getMcpSessionOptions } from '../config';
 
 // Schema definitions
 export const getStockPriceSchema = z.object({
@@ -51,7 +52,7 @@ export const getEarningsSchema = z.object({
 // Tool implementations
 export async function getStockPrice(args: z.infer<typeof getStockPriceSchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     const data = await ticker.getPrice();
     return JSON.stringify(data, null, 2);
   } catch (error) {
@@ -61,7 +62,7 @@ export async function getStockPrice(args: z.infer<typeof getStockPriceSchema>): 
 
 export async function getStockSummary(args: z.infer<typeof getStockSummarySchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     const data = await ticker.getSummaryDetail();
     return JSON.stringify(data, null, 2);
   } catch (error) {
@@ -71,7 +72,7 @@ export async function getStockSummary(args: z.infer<typeof getStockSummarySchema
 
 export async function getStockProfile(args: z.infer<typeof getStockProfileSchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     const data = await ticker.getAssetProfile();
     return JSON.stringify(data, null, 2);
   } catch (error) {
@@ -81,7 +82,7 @@ export async function getStockProfile(args: z.infer<typeof getStockProfileSchema
 
 export async function getStockHistory(args: z.infer<typeof getStockHistorySchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     const data = await ticker.getHistory({
       period: args.period || '1y',
       interval: args.interval || '1d',
@@ -96,7 +97,7 @@ export async function getStockHistory(args: z.infer<typeof getStockHistorySchema
 
 export async function getFinancials(args: z.infer<typeof getFinancialsSchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     // Convert frequency to short form: 'a' for annual, 'q' for quarterly
     const freq = args.frequency === 'quarterly' ? 'q' : 'a';
 
@@ -126,7 +127,7 @@ export async function getFinancials(args: z.infer<typeof getFinancialsSchema>): 
 
 export async function getOptions(args: z.infer<typeof getOptionsSchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbol);
+    const ticker = new Ticker(args.symbol, getMcpSessionOptions());
     const data = await ticker.getOptionChain();
     return JSON.stringify(data, null, 2);
   } catch (error) {
@@ -136,7 +137,7 @@ export async function getOptions(args: z.infer<typeof getOptionsSchema>): Promis
 
 export async function getKeyStats(args: z.infer<typeof getKeyStatsSchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     const data = await ticker.getKeyStats();
     return JSON.stringify(data, null, 2);
   } catch (error) {
@@ -146,7 +147,7 @@ export async function getKeyStats(args: z.infer<typeof getKeyStatsSchema>): Prom
 
 export async function getRecommendations(args: z.infer<typeof getRecommendationsSchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     const data = await ticker.getRecommendationTrend();
     return JSON.stringify(data, null, 2);
   } catch (error) {
@@ -156,7 +157,7 @@ export async function getRecommendations(args: z.infer<typeof getRecommendations
 
 export async function getEarnings(args: z.infer<typeof getEarningsSchema>): Promise<string> {
   try {
-    const ticker = new Ticker(args.symbols);
+    const ticker = new Ticker(args.symbols, getMcpSessionOptions());
     const data = await ticker.getEarnings();
     return JSON.stringify(data, null, 2);
   } catch (error) {

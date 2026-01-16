@@ -10,6 +10,8 @@ export { BaseFinance } from './core/BaseFinance';
 export { Ticker, createTicker } from './core/Ticker';
 export { Screener, createScreener } from './core/Screener';
 export { Research, createResearch } from './core/Research';
+export { ProxyManager } from './core/ProxyManager';
+export type { ProxyConfig, ProxyManagerOptions } from './core/ProxyManager';
 
 // Authentication
 export { HeadlessAuth, yahooLogin, hasPuppeteer } from './auth/HeadlessAuth';

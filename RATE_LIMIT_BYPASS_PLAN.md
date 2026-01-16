@@ -69,10 +69,10 @@ yfinance-mcp-ts/
 | Browser User-Agent rotation | ✅ Implemented | 14 Chrome variants |
 | Cookie jar persistence | ✅ Implemented | `tough-cookie` |
 | Crumb (CSRF) token handling | ✅ Implemented | Auto-refresh |
-| Retry with exponential backoff | ⚠️ Exists but unused | `retry()` in helpers.ts |
+| Retry with exponential backoff | ✅ Implemented | `retry()` in SessionManager |
 | Rate limiting | ❌ Not implemented | No request throttling |
 | TLS fingerprinting | ❌ Not implemented | Detectable by JA3 hash |
-| Proxy support | ❌ Not implemented | Config exists, unused |
+| Proxy rotation | ✅ Implemented | ProxyManager with failure tracking |
 | Response caching | ❌ Not implemented | All requests hit API |
 | Fallback APIs | ❌ Not implemented | Yahoo-only |
 
@@ -545,11 +545,12 @@ export class BrowserImpersonatedClient {
 
 ---
 
-### Phase 4: Proxy Rotation
+### Phase 4: Proxy Rotation ✅ IMPLEMENTED
 
 **Priority:** MEDIUM
 **Effort:** MEDIUM
 **Impact:** Essential for high-volume usage
+**Status:** ✅ Completed - ProxyManager with round-robin rotation and failure tracking
 
 #### 4.1 Proxy Types Comparison
 

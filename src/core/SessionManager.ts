@@ -20,6 +20,7 @@ import {
   isRateLimitError,
   isInvalidCrumbError,
 } from '../utils/helpers';
+import { ProxyManager, ProxyConfig } from './ProxyManager';
 
 // Constants
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
@@ -49,6 +50,7 @@ export class SessionManager {
   private password?: string;
   private retryConfig: Required<Omit<RetryConfig, 'onRetry'>> & { onRetry?: RetryConfig['onRetry'] };
   private crumbRefreshInProgress = false;
+  private proxyManager?: ProxyManager;
 
   constructor(options: SessionOptions = {}) {
     this.cookieJar = new CookieJar();
@@ -63,6 +65,16 @@ export class SessionManager {
       ...DEFAULT_RETRY_CONFIG,
       ...options.retry,
     };
+
+    // Initialize proxy manager if proxy rotation is configured
+    if (options.proxyRotation?.proxyList) {
+      this.proxyManager = new ProxyManager({
+        maxFailures: options.proxyRotation.maxFailures,
+        cooldownMs: options.proxyRotation.cooldownMs,
+      });
+      this.proxyManager.addProxiesFromString(options.proxyRotation.proxyList);
+      console.log(`ProxyManager initialized with ${this.proxyManager.size()} proxies`);
+    }
 
     // Create axios instance with cookie jar support
     this.client = wrapper(
@@ -313,6 +325,7 @@ export class SessionManager {
 
   /**
    * Execute the actual GET request (internal method)
+   * Uses proxy rotation if ProxyManager is configured
    */
   private async executeGet<T = unknown>(
     url: string,
@@ -323,16 +336,39 @@ export class SessionManager {
       ...(this.crumb && { crumb: this.crumb }),
     };
 
-    const response = await this.client.get<T>(url, {
-      ...config,
-      params,
-      headers: {
-        ...getBrowserHeadersAsRecord(this.headers),
-        ...config?.headers,
-      },
-    });
+    // Get next proxy if proxy rotation is enabled
+    const proxy = this.proxyManager?.getNext();
+    const proxyConfig = proxy
+      ? {
+          httpsAgent: this.proxyManager!.getProxyAgent(proxy),
+          proxy: false as const, // Disable axios's built-in proxy to use agent
+        }
+      : {};
 
-    return response.data;
+    try {
+      const response = await this.client.get<T>(url, {
+        ...config,
+        ...proxyConfig,
+        params,
+        headers: {
+          ...getBrowserHeadersAsRecord(this.headers),
+          ...config?.headers,
+        },
+      });
+
+      // Report success to proxy manager
+      if (proxy) {
+        this.proxyManager!.reportSuccess(proxy);
+      }
+
+      return response.data;
+    } catch (error) {
+      // Report failure to proxy manager for proxy-related errors
+      if (proxy && this.isProxyError(error)) {
+        this.proxyManager!.reportFailure(proxy);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -389,6 +425,7 @@ export class SessionManager {
 
   /**
    * Execute the actual POST request (internal method)
+   * Uses proxy rotation if ProxyManager is configured
    */
   private async executePost<T = unknown>(
     url: string,
@@ -400,16 +437,39 @@ export class SessionManager {
       ...(this.crumb && { crumb: this.crumb }),
     };
 
-    const response = await this.client.post<T>(url, data, {
-      ...config,
-      params,
-      headers: {
-        ...getBrowserHeadersAsRecord(this.headers),
-        ...config?.headers,
-      },
-    });
+    // Get next proxy if proxy rotation is enabled
+    const proxy = this.proxyManager?.getNext();
+    const proxyConfig = proxy
+      ? {
+          httpsAgent: this.proxyManager!.getProxyAgent(proxy),
+          proxy: false as const, // Disable axios's built-in proxy to use agent
+        }
+      : {};
 
-    return response.data;
+    try {
+      const response = await this.client.post<T>(url, data, {
+        ...config,
+        ...proxyConfig,
+        params,
+        headers: {
+          ...getBrowserHeadersAsRecord(this.headers),
+          ...config?.headers,
+        },
+      });
+
+      // Report success to proxy manager
+      if (proxy) {
+        this.proxyManager!.reportSuccess(proxy);
+      }
+
+      return response.data;
+    } catch (error) {
+      // Report failure to proxy manager for proxy-related errors
+      if (proxy && this.isProxyError(error)) {
+        this.proxyManager!.reportFailure(proxy);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -494,6 +554,81 @@ export class SessionManager {
       ...this.retryConfig,
       ...config,
     };
+  }
+
+  /**
+   * Check if an error is likely caused by a proxy issue
+   */
+  private isProxyError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const axiosError = error as {
+      code?: string;
+      response?: { status?: number };
+      message?: string;
+    };
+
+    // Connection errors often indicate proxy issues
+    const connectionErrors = [
+      'ECONNREFUSED',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ENOTFOUND',
+      'EPIPE',
+      'EHOSTUNREACH',
+      'ENETUNREACH',
+      'EAI_AGAIN',
+    ];
+
+    if (axiosError.code && connectionErrors.includes(axiosError.code)) {
+      return true;
+    }
+
+    // Proxy authentication failure
+    if (axiosError.response?.status === 407) {
+      return true;
+    }
+
+    // Check for proxy-related error messages
+    const message = axiosError.message?.toLowerCase() || '';
+    if (
+      message.includes('proxy') ||
+      message.includes('tunnel') ||
+      message.includes('socket hang up')
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Get the proxy manager instance (if configured)
+   */
+  getProxyManager(): ProxyManager | undefined {
+    return this.proxyManager;
+  }
+
+  /**
+   * Get proxy statistics (if proxy rotation is enabled)
+   */
+  getProxyStats(): Array<{
+    host: string;
+    port: number;
+    failures: number;
+    successCount: number;
+    isHealthy: boolean;
+  }> | null {
+    return this.proxyManager?.getStats() ?? null;
+  }
+
+  /**
+   * Check if proxy rotation is enabled
+   */
+  hasProxyRotation(): boolean {
+    return this.proxyManager !== undefined && this.proxyManager.size() > 0;
   }
 }
 
