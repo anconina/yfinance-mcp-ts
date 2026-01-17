@@ -29,7 +29,7 @@ Add to your Claude Desktop configuration (`~/.config/claude/claude_desktop_confi
   "mcpServers": {
     "yfinance": {
       "command": "npx",
-      "args": ["yfinance-mcp"]
+      "args": ["yfinance-mcp-ts"]
     }
   }
 }
@@ -128,7 +128,7 @@ Once configured, you can ask Claude things like:
 npm run mcp
 
 # Or directly
-npx yfinance-mcp
+npx yfinance-mcp-ts
 
 # Or with node
 node dist/mcp/server.js
