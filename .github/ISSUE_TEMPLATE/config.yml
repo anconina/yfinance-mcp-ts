@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/anconina/yfinance-mcp-ts#readme
+    about: Check the README for usage examples and API reference
+  - name: Stack Overflow
+    url: https://stackoverflow.com/questions/tagged/yahoo-finance
+    about: Ask questions about Yahoo Finance APIs on Stack Overflow
+  - name: Discussions
+    url: https://github.com/anconina/yfinance-mcp-ts/discussions
+    about: Ask questions or discuss ideas in GitHub Discussions
