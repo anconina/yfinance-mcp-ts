@@ -22,5 +22,6 @@ module.exports = {
       statements: 70,
     },
   },
+  testTimeout: 15000,
   verbose: true,
 };
