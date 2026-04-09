@@ -77,7 +77,7 @@ export async function getRecommendedHttpClient(): Promise<HttpClientType> {
     if (await isImpitAvailable()) {
       return 'impit';
     }
-    console.warn(
+    console.error(
       'YFINANCE_HTTP_CLIENT=impit but impit is not available. Falling back to axios.'
     );
     return 'axios';
@@ -152,32 +152,32 @@ export async function logMigrationStatus(verbose = false): Promise<void> {
   const recommended = await getRecommendedHttpClient();
   const envConfig = getHttpClientConfigFromEnv();
 
-  console.log('=== yfinance-mcp-ts HTTP Client Status ===');
-  console.log(`Impit available: ${impitAvailable ? 'Yes' : 'No'}`);
-  console.log(`Recommended client: ${recommended}`);
+  console.error('=== yfinance-mcp-ts HTTP Client Status ===');
+  console.error(`Impit available: ${impitAvailable ? 'Yes' : 'No'}`);
+  console.error(`Recommended client: ${recommended}`);
 
   if (envConfig.httpClient) {
-    console.log(`Environment override: ${envConfig.httpClient}`);
+    console.error(`Environment override: ${envConfig.httpClient}`);
   }
 
   if (verbose) {
-    console.log('\nEnvironment configuration:');
-    console.log(`  YFINANCE_HTTP_CLIENT: ${process.env.YFINANCE_HTTP_CLIENT || '(not set)'}`);
-    console.log(`  YFINANCE_HTTP3: ${process.env.YFINANCE_HTTP3 || '(not set)'}`);
-    console.log(
+    console.error('\nEnvironment configuration:');
+    console.error(`  YFINANCE_HTTP_CLIENT: ${process.env.YFINANCE_HTTP_CLIENT || '(not set)'}`);
+    console.error(`  YFINANCE_HTTP3: ${process.env.YFINANCE_HTTP3 || '(not set)'}`);
+    console.error(
       `  YFINANCE_IGNORE_TLS_ERRORS: ${process.env.YFINANCE_IGNORE_TLS_ERRORS || '(not set)'}`
     );
-    console.log(
+    console.error(
       `  YFINANCE_REQUEST_TIMEOUT: ${process.env.YFINANCE_REQUEST_TIMEOUT || '(not set)'}`
     );
 
     if (!impitAvailable) {
-      console.log('\nNote: impit requires Node.js 20+ and may not be available on all platforms.');
-      console.log('The axios fallback will be used automatically when impit is unavailable.');
+      console.error('\nNote: impit requires Node.js 20+ and may not be available on all platforms.');
+      console.error('The axios fallback will be used automatically when impit is unavailable.');
     }
   }
 
-  console.log('==========================================');
+  console.error('==========================================');
 }
 
 /**

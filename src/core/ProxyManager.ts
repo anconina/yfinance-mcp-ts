@@ -97,7 +97,7 @@ export class ProxyManager {
     );
 
     if (!match) {
-      console.warn(`Invalid proxy format: ${proxyString}`);
+      console.error(`Invalid proxy format: ${proxyString}`);
       return null;
     }
 
@@ -141,7 +141,7 @@ export class ProxyManager {
     } while (this.currentIndex !== startIndex);
 
     // All proxies are unhealthy, reset all and return first
-    console.warn('All proxies failed, resetting failure counts');
+    console.error('All proxies failed, resetting failure counts');
     this.resetAllFailures();
     return this.proxies[0]?.proxy ?? null;
   }
@@ -167,7 +167,7 @@ export class ProxyManager {
       state.lastFailure = Date.now();
 
       if (state.failures >= this.maxFailures) {
-        console.warn(
+        console.error(
           `Proxy ${proxy.host}:${proxy.port} marked as unhealthy after ${state.failures} failures`
         );
       }
