@@ -103,7 +103,7 @@ export class SessionManager {
         cooldownMs: options.proxyRotation.cooldownMs,
       });
       this.proxyManager.addProxiesFromString(options.proxyRotation.proxyList);
-      console.log(`ProxyManager initialized with ${this.proxyManager.size()} proxies`);
+      console.error(`ProxyManager initialized with ${this.proxyManager.size()} proxies`);
     }
 
     // Initialize the appropriate HTTP client
@@ -131,7 +131,7 @@ export class SessionManager {
       headers: getBrowserHeadersAsRecord(this.headers),
     });
 
-    console.log(`SessionManager using impit client (browser: ${this.impitClient.getBrowserConfig().browser})`);
+    console.error(`SessionManager using impit client (browser: ${this.impitClient.getBrowserConfig().browser})`);
   }
 
   /**
@@ -142,7 +142,7 @@ export class SessionManager {
   private initializeAxiosClient(options: SessionOptions): void {
     // Log deprecation warning if axios is explicitly requested
     if (options.httpClient === 'axios') {
-      console.warn(
+      console.error(
         '[DEPRECATION] axios HTTP client is deprecated and may be removed in a future version. ' +
           'Consider using impit (default) for better rate limit handling. ' +
           'Set httpClient: "impit" or remove the httpClient option to use the recommended client.'
@@ -165,7 +165,7 @@ export class SessionManager {
     // Attach cookie jar
     (this.axiosClient.defaults as unknown as { jar: CookieJar }).jar = this.cookieJar;
 
-    console.log(`SessionManager using axios client (browser: ${this.impersonate})`);
+    console.error(`SessionManager using axios client (browser: ${this.impersonate})`);
   }
 
   /**
@@ -204,10 +204,10 @@ export class SessionManager {
         return true;
       }
 
-      console.warn('Premium login failed:', result.error);
+      console.error('Premium login failed:', result.error);
       return false;
     } catch (error) {
-      console.warn('Premium login error:', (error as Error).message);
+      console.error('Premium login error:', (error as Error).message);
       return false;
     }
   }
@@ -280,7 +280,7 @@ export class SessionManager {
     } catch (error) {
       // Log warning but don't fail - session setup is best-effort
       // The crumb retrieval that follows will still work in most cases
-      console.warn('Session setup warning:', (error as Error).message);
+      console.error('Session setup warning:', (error as Error).message);
     }
   }
 
@@ -358,7 +358,7 @@ export class SessionManager {
           });
           crumb = response.data;
         } else {
-          console.warn('No HTTP client available');
+          console.error('No HTTP client available');
           return null;
         }
 
@@ -376,7 +376,7 @@ export class SessionManager {
         if (attempt < maxAttempts) {
           await this.sleep(retryDelay);
         } else {
-          console.warn('Crumb retrieval failed after', maxAttempts, 'attempts:', (error as Error).message);
+          console.error('Crumb retrieval failed after', maxAttempts, 'attempts:', (error as Error).message);
         }
       }
     }
@@ -495,7 +495,7 @@ export class SessionManager {
         if (isRateLimitError(error)) {
           const retryAfter = getRetryAfterMs(error);
           const retryInfo = retryAfter ? ` (Retry-After: ${retryAfter}ms)` : '';
-          console.warn(`Rate limited${retryInfo}. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
+          console.error(`Rate limited${retryInfo}. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
         }
       },
     };
@@ -629,7 +629,7 @@ export class SessionManager {
         if (isRateLimitError(error)) {
           const retryAfter = getRetryAfterMs(error);
           const retryInfo = retryAfter ? ` (Retry-After: ${retryAfter}ms)` : '';
-          console.warn(`Rate limited${retryInfo}. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
+          console.error(`Rate limited${retryInfo}. Retry ${attempt}/${this.retryConfig.maxRetries} in ${delay}ms...`);
         }
       },
     };
@@ -770,10 +770,10 @@ export class SessionManager {
 
     this.crumbRefreshInProgress = true;
     try {
-      console.warn('Refreshing crumb token...');
+      console.error('Refreshing crumb token...');
       this.crumb = await this.getCrumb();
       if (this.crumb) {
-        console.warn('Crumb token refreshed successfully');
+        console.error('Crumb token refreshed successfully');
       }
     } finally {
       this.crumbRefreshInProgress = false;
@@ -880,12 +880,12 @@ export class SessionManager {
     // Get next available proxy
     const nextProxy = this.proxyManager.getNext();
     if (!nextProxy) {
-      console.warn('No healthy proxies available for rotation');
+      console.error('No healthy proxies available for rotation');
       return;
     }
 
     const proxyUrl = this.proxyManager.getProxyUrl(nextProxy);
-    console.warn(`Rotating proxy to: ${nextProxy.host}:${nextProxy.port}`);
+    console.error(`Rotating proxy to: ${nextProxy.host}:${nextProxy.port}`);
 
     // Update the impit client with the new proxy
     if (this.httpClientType === 'impit' && this.impitClient) {
@@ -913,7 +913,7 @@ export class SessionManager {
     this.impitClient.rotateBrowser();
     const newBrowser = this.impitClient.getBrowserConfig().browser;
 
-    console.warn(`Rotating browser fingerprint: ${oldBrowser} → ${newBrowser}`);
+    console.error(`Rotating browser fingerprint: ${oldBrowser} → ${newBrowser}`);
   }
 
   /**
@@ -949,7 +949,7 @@ export class SessionManager {
         // TLS errors might indicate fingerprint detection, rotate browser
         if (this.httpClientType === 'impit' && this.impitClient) {
           this.impitClient.rotateBrowser();
-          console.warn('TLS error detected, rotated browser fingerprint');
+          console.error('TLS error detected, rotated browser fingerprint');
         }
         break;
 
@@ -1001,7 +1001,7 @@ export class SessionManager {
     this.impitClient.rotateBrowser();
     const newBrowser = this.impitClient.getBrowserConfig();
 
-    console.log(`Browser rotated: ${oldBrowser.browser}/${oldBrowser.platform} → ${newBrowser.browser}/${newBrowser.platform}`);
+    console.error(`Browser rotated: ${oldBrowser.browser}/${oldBrowser.platform} → ${newBrowser.browser}/${newBrowser.platform}`);
     return newBrowser;
   }
 

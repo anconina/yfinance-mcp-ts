@@ -349,7 +349,7 @@ export class Research extends BaseFinance {
           }
         }
       } catch (error) {
-        console.warn(`Research request failed: ${(error as Error).message}`);
+        console.error(`Research request failed: ${(error as Error).message}`);
         break;
       }
     }
@@ -424,7 +424,7 @@ export class Research extends BaseFinance {
         });
       }
     } catch (error) {
-      console.warn(`Earnings request failed: ${(error as Error).message}`);
+      console.error(`Earnings request failed: ${(error as Error).message}`);
     }
 
     return [];
@@ -472,7 +472,7 @@ export class Research extends BaseFinance {
         });
       }
     } catch (error) {
-      console.warn(`Splits request failed: ${(error as Error).message}`);
+      console.error(`Splits request failed: ${(error as Error).message}`);
     }
 
     return [];
@@ -520,7 +520,7 @@ export class Research extends BaseFinance {
         });
       }
     } catch (error) {
-      console.warn(`IPO request failed: ${(error as Error).message}`);
+      console.error(`IPO request failed: ${(error as Error).message}`);
     }
 
     return [];
