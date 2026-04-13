@@ -57,3 +57,29 @@ export const DEFAULT_STRIKE_RANGE = 3;
 
 /** Default maximum expirations shown in options summary view. */
 export const DEFAULT_MAX_EXPIRATIONS = 3;
+
+/**
+ * Default fields projected onto each screener quote in JSON format.
+ * Covers identification, price action, volume, fundamentals, and classification.
+ * Keeps ~20 fields per quote (~2K chars) vs ~86 raw fields (~5K chars).
+ */
+export const DEFAULT_SCREENER_FIELDS: readonly string[] = [
+  // Identification
+  'symbol', 'shortName', 'longName', 'quoteType', 'exchange',
+  // Price action
+  'regularMarketPrice', 'regularMarketChange', 'regularMarketChangePercent',
+  'regularMarketOpen', 'regularMarketDayHigh', 'regularMarketDayLow',
+  'regularMarketPreviousClose', 'regularMarketVolume',
+  // Valuation
+  'marketCap', 'trailingPE', 'forwardPE', 'priceToBook',
+  // Fundamentals
+  'trailingAnnualDividendYield', 'epsTrailingTwelveMonths',
+  // Range context
+  'fiftyTwoWeekHigh', 'fiftyTwoWeekLow',
+  'fiftyDayAverage', 'twoHundredDayAverage',
+  // Classification
+  'sector', 'industry',
+] as const;
+
+/** Hard cap for JSON screener responses (higher than text -- structured data is denser). */
+export const SCREENER_JSON_HARD_CAP = 40_000;

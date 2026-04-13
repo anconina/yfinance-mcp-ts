@@ -14,7 +14,10 @@ import {
   toMarkdownTable,
   wrapResponse,
   serializeResponse,
+  guardSize,
   FormatType,
+  DEFAULT_SCREENER_FIELDS,
+  SCREENER_JSON_HARD_CAP,
 } from './index';
 
 /** Options for list_screeners response formatting. */
@@ -26,6 +29,8 @@ export interface ListScreenersFormatOptions {
 /** Options for get_screener response formatting. */
 export interface ScreenerFormatOptions {
   format?: FormatType;
+  /** Field names to include per quote in JSON output. Defaults to DEFAULT_SCREENER_FIELDS. */
+  fields?: string[];
 }
 
 /**
@@ -219,6 +224,49 @@ function titleCase(key: string): string {
 }
 
 /**
+ * Project each quote in screener data down to the requested field set.
+ * Preserves the top-level screener-key structure and the quotes array wrapper.
+ *
+ * @param data - Raw screener response keyed by screener name
+ * @param fields - Field names to keep per quote
+ * @returns Projected copy of data
+ */
+function projectScreenerFields(
+  data: Record<string, unknown>,
+  fields: string[]
+): Record<string, unknown> {
+  const fieldSet = new Set(fields);
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    const entry = value as Record<string, unknown> | undefined;
+    const quotes = (entry?.quotes ?? entry) as Record<string, unknown>[] | undefined;
+
+    if (!Array.isArray(quotes)) {
+      result[key] = value;
+      continue;
+    }
+
+    const projectedQuotes = quotes.map((q) => {
+      const projected: Record<string, unknown> = {};
+      for (const f of fieldSet) {
+        if (f in q) projected[f] = q[f];
+      }
+      return projected;
+    });
+
+    // Preserve original structure: if entry had .quotes, wrap; otherwise bare array
+    if (entry && typeof entry === 'object' && 'quotes' in entry) {
+      result[key] = { ...entry, quotes: projectedQuotes };
+    } else {
+      result[key] = projectedQuotes;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Format the get_screener response as a markdown table.
  *
  * Renders screener quotes with 7 columns: Symbol, Name, Price, Change,
@@ -237,9 +285,12 @@ export function formatScreenerResponse(
     return wrapResponse('No screener data available', { dataType: 'Screener Results' });
   }
 
-  // JSON path
+  // JSON path: project fields and apply size guard
   if (options.format === 'json') {
-    return serializeResponse(data, 'json');
+    const fields = options.fields ?? [...DEFAULT_SCREENER_FIELDS];
+    const projected = projectScreenerFields(data, fields);
+    const json = JSON.stringify(projected);
+    return guardSize(json, SCREENER_JSON_HARD_CAP, SCREENER_JSON_HARD_CAP);
   }
 
   // Text path
