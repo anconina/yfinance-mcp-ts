@@ -11,6 +11,7 @@
 import {
   toMarkdownTable,
   wrapResponse,
+  guardSize,
   FormatType,
 } from './index';
 
@@ -37,7 +38,7 @@ export function formatCurrenciesResponse(
 ): string {
   // JSON path
   if (options.format === 'json') {
-    return JSON.stringify(data);
+    return guardSize(JSON.stringify(data));
   }
 
   // Text path

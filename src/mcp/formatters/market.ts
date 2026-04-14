@@ -14,6 +14,7 @@ import {
   formatCompact,
   formatChange,
   wrapResponse,
+  guardSize,
   FormatType,
 } from './index';
 
@@ -39,7 +40,7 @@ export function formatMarketSummaryResponse(
 ): string {
   // JSON path
   if (options.format === 'json') {
-    return JSON.stringify(data);
+    return guardSize(JSON.stringify(data));
   }
 
   // Text path
