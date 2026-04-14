@@ -37,8 +37,8 @@ export const getStockProfileSchema = z.object({
 
 export const getStockHistorySchema = z.object({
   symbols: z.string().describe('Stock symbol(s), space-separated'),
-  period: z.string().optional().describe('Time period: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max (default: 1y)'),
-  interval: z.string().optional().describe('Data interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo (default: 1d)'),
+  period: z.enum(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']).optional().describe('Time period (default: 1y)'),
+  interval: z.enum(['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo']).optional().describe('Data interval (default: 1d)'),
   start: z.string().optional().describe('Start date in YYYY-MM-DD format'),
   end: z.string().optional().describe('End date in YYYY-MM-DD format'),
   aggregate: z.enum(['daily', 'weekly', 'monthly', 'auto']).optional()
@@ -313,11 +313,13 @@ export const tickerTools = [
         },
         period: {
           type: 'string',
-          description: 'Time period: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max (default: 1y)',
+          enum: ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'],
+          description: 'Time period (default: 1y)',
         },
         interval: {
           type: 'string',
-          description: 'Data interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo (default: 1d)',
+          enum: ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo'],
+          description: 'Data interval (default: 1d)',
         },
         start: {
           type: 'string',

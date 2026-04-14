@@ -81,7 +81,8 @@ export const screenerTools = [
       properties: {
         category: {
           type: 'string',
-          description: 'Filter by category (e.g., "Market Movers", "Value", "Growth", "ETFs", "Sectors")',
+          enum: ['Market Movers', 'Value', 'Growth', 'Analyst Picks', 'Dividends & Income', 'Strategies', 'Crypto', 'ETFs', 'Mutual Funds', 'Sectors'],
+          description: 'Filter by category',
         },
         format: {
           type: 'string',

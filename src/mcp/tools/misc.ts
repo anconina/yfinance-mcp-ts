@@ -130,6 +130,7 @@ export const miscTools = [
       properties: {
         country: {
           type: 'string',
+          enum: ['france', 'india', 'hong kong', 'germany', 'canada', 'spain', 'italy', 'united states', 'australia', 'united kingdom', 'brazil', 'new zealand', 'singapore', 'taiwan'],
           description: 'Country for market summary (default: united states)',
         },
         format: {
@@ -151,6 +152,7 @@ export const miscTools = [
       properties: {
         country: {
           type: 'string',
+          enum: ['france', 'india', 'hong kong', 'germany', 'canada', 'spain', 'italy', 'united states', 'australia', 'united kingdom', 'brazil', 'new zealand', 'singapore', 'taiwan'],
           description: 'Country for trending stocks (default: united states)',
         },
         count: {

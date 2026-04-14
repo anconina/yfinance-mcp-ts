@@ -167,9 +167,10 @@ export function formatListScreenersResponse(
     return serializeResponse(groups as Record<string, unknown>, 'json');
   }
 
-  // Text path with category filter
+  // Text path with category filter (case-insensitive lookup)
   if (options.category) {
-    const cat = options.category;
+    const catInput = options.category;
+    const cat = Object.keys(groups).find(k => k.toLowerCase() === catInput.toLowerCase()) ?? catInput;
     const keys = groups[cat];
     if (!keys) {
       const available = sortCategories(Object.keys(groups)).join(', ');

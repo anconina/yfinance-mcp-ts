@@ -126,7 +126,7 @@ export class Screener extends BaseFinance {
       throw new Error(
         `Invalid screener(s): ${invalid.join(', ')}. ` +
         `Examples of valid screeners: ${availablePreview}... ` +
-        `Use .availableScreeners to see all options.`
+        `Call list_screeners tool to see all available screeners.`
       );
     }
 
