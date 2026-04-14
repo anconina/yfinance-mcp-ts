@@ -81,8 +81,9 @@ export const DEFAULT_SCREENER_FIELDS: readonly string[] = [
   'sector', 'industry',
 ] as const;
 
-/** Hard cap for JSON screener responses (higher than text -- structured data is denser). */
-export const SCREENER_JSON_HARD_CAP = 40_000;
+/** Hard cap for JSON screener responses (higher than text -- structured data is denser).
+ *  Must stay under the 40K transport cap in server.ts to avoid double-truncation. */
+export const SCREENER_JSON_HARD_CAP = 30_000;
 
 /** Default fields for JSON summary responses. Matches the 6 text groups. */
 export const DEFAULT_SUMMARY_FIELDS: readonly string[] = [

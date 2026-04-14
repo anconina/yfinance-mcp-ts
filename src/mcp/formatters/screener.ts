@@ -14,7 +14,7 @@ import {
   toMarkdownTable,
   wrapResponse,
   serializeResponse,
-  guardSize,
+  guardJsonSize,
   FormatType,
   DEFAULT_SCREENER_FIELDS,
   SCREENER_JSON_HARD_CAP,
@@ -290,8 +290,7 @@ export function formatScreenerResponse(
   if (options.format === 'json') {
     const fields = options.fields ?? [...DEFAULT_SCREENER_FIELDS];
     const projected = projectScreenerFields(data, fields);
-    const json = JSON.stringify(projected);
-    return guardSize(json, SCREENER_JSON_HARD_CAP, SCREENER_JSON_HARD_CAP);
+    return guardJsonSize(projected, SCREENER_JSON_HARD_CAP);
   }
 
   // Text path

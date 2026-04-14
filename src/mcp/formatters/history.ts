@@ -15,9 +15,10 @@ import {
   formatCompact,
   toMarkdownTable,
   wrapResponse,
-  serializeResponse,
+  guardJsonSize,
   formatHint,
   FormatType,
+  HARD_CAP_CHARS,
   DEFAULT_MAX_ROWS,
   OHLCVRow,
   PriceStats,
@@ -268,7 +269,7 @@ export function formatHistoryResponse(
       result[sym] = entry;
     }
 
-    return serializeResponse(result, 'json');
+    return guardJsonSize(result, HARD_CAP_CHARS, true);
   }
 
   // Text path

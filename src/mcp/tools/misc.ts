@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 import { search, getMarketSummary, getTrending, getCurrencies, getValidCountries } from '../../misc/functions';
-import { isValidCountry } from '../../config/countries';
+import { isValidCountry, resolveCountry } from '../../config/countries';
 import { getMcpSessionOptions } from '../config';
 import { formatMarketSummaryResponse, formatCurrenciesResponse, FormatType, guardSize, DEFAULT_QUOTE_FIELDS } from '../formatters';
 
@@ -36,17 +36,20 @@ export async function searchStocks(args: z.infer<typeof searchStocksSchema>): Pr
   try {
     const results = await search(args.query, {
       quotesCount: args.limit || 10,
+      newsCount: 0,
       sessionOptions: getMcpSessionOptions(),
     });
     const fieldSet = new Set<string>(DEFAULT_QUOTE_FIELDS);
-    const projected = results && typeof results === 'object' && Array.isArray((results as Record<string, unknown>).quotes)
-      ? { ...results as Record<string, unknown>, quotes: ((results as Record<string, unknown>).quotes as Record<string, unknown>[]).map((q: Record<string, unknown>) => {
-          const p: Record<string, unknown> = {};
-          for (const f of fieldSet) { if (f in q) p[f] = q[f]; }
-          return p;
-        })}
-      : results;
-    return guardSize(JSON.stringify(projected));
+    if (results && typeof results === 'object' && Array.isArray((results as Record<string, unknown>).quotes)) {
+      const r = results as Record<string, unknown>;
+      const quotes = (r.quotes as Record<string, unknown>[]).map((q: Record<string, unknown>) => {
+        const p: Record<string, unknown> = {};
+        for (const f of fieldSet) { if (f in q) p[f] = q[f]; }
+        return p;
+      });
+      return guardSize(JSON.stringify({ count: quotes.length, quotes }));
+    }
+    return guardSize(JSON.stringify(results));
   } catch (error) {
     throw new Error(`Failed to search stocks: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
@@ -54,9 +57,9 @@ export async function searchStocks(args: z.infer<typeof searchStocksSchema>): Pr
 
 export async function marketSummary(args: z.infer<typeof getMarketSummarySchema>): Promise<string> {
   try {
-    const country = args.country || 'united states';
-    if (!isValidCountry(country)) {
-      throw new Error(`Invalid country: "${country}". Valid countries: ${getValidCountries().join(', ')}`);
+    const country = resolveCountry(args.country || 'united states');
+    if (!country) {
+      throw new Error(`Invalid country: "${args.country}". Valid countries: ${getValidCountries().join(', ')}`);
     }
     const data = await getMarketSummary(country, getMcpSessionOptions());
     return formatMarketSummaryResponse(data, {
@@ -69,9 +72,9 @@ export async function marketSummary(args: z.infer<typeof getMarketSummarySchema>
 
 export async function trending(args: z.infer<typeof getTrendingSchema>): Promise<string> {
   try {
-    const country = args.country || 'united states';
-    if (!isValidCountry(country)) {
-      throw new Error(`Invalid country: "${country}". Valid countries: ${getValidCountries().join(', ')}`);
+    const country = resolveCountry(args.country || 'united states');
+    if (!country) {
+      throw new Error(`Invalid country: "${args.country}". Valid countries: ${getValidCountries().join(', ')}`);
     }
     const data = await getTrending(country, getMcpSessionOptions());
     // Limit results if count is specified
@@ -148,8 +151,9 @@ export const miscTools = [
       properties: {
         country: {
           type: 'string',
-          enum: ['france', 'india', 'hong kong', 'germany', 'canada', 'spain', 'italy', 'united states', 'australia', 'united kingdom', 'brazil', 'new zealand', 'singapore', 'taiwan'],
-          description: 'Country for market summary (default: united states)',
+          enum: ['france', 'india', 'hong kong', 'germany', 'canada', 'spain', 'italy', 'united states', 'australia', 'united kingdom', 'brazil', 'new zealand', 'singapore', 'taiwan',
+                 'FR', 'IN', 'HK', 'DE', 'CA', 'ES', 'IT', 'US', 'AU', 'GB', 'BR', 'NZ', 'SG', 'TW'],
+          description: 'Country for market summary — full name or ISO code (default: united states)',
         },
         format: {
           type: 'string',
@@ -170,8 +174,9 @@ export const miscTools = [
       properties: {
         country: {
           type: 'string',
-          enum: ['france', 'india', 'hong kong', 'germany', 'canada', 'spain', 'italy', 'united states', 'australia', 'united kingdom', 'brazil', 'new zealand', 'singapore', 'taiwan'],
-          description: 'Country for trending stocks (default: united states)',
+          enum: ['france', 'india', 'hong kong', 'germany', 'canada', 'spain', 'italy', 'united states', 'australia', 'united kingdom', 'brazil', 'new zealand', 'singapore', 'taiwan',
+                 'FR', 'IN', 'HK', 'DE', 'CA', 'ES', 'IT', 'US', 'AU', 'GB', 'BR', 'NZ', 'SG', 'TW'],
+          description: 'Country for trending stocks — full name or ISO code (default: united states)',
         },
         count: {
           type: 'number',

@@ -886,14 +886,27 @@ describe('MCP Tools', () => {
 
     test('trending should throw for invalid country', async () => {
       // isValidCountry is imported from config/countries (not mocked), so real validation runs
-      // "us" is not a valid country name (should be "united states")
-      await expect(trending({ country: 'us' })).rejects.toThrow('Invalid country');
-      await expect(trending({ country: 'us' })).rejects.toThrow('Valid countries:');
+      await expect(trending({ country: 'narnia' })).rejects.toThrow('Invalid country');
+      await expect(trending({ country: 'narnia' })).rejects.toThrow('Valid countries:');
     });
 
     test('marketSummary should throw for invalid country', async () => {
-      await expect(marketSummary({ country: 'US' })).rejects.toThrow('Invalid country');
-      await expect(marketSummary({ country: 'US' })).rejects.toThrow('Valid countries:');
+      await expect(marketSummary({ country: 'narnia' })).rejects.toThrow('Invalid country');
+      await expect(marketSummary({ country: 'narnia' })).rejects.toThrow('Valid countries:');
+    });
+
+    test('trending should accept ISO country codes', async () => {
+      const { getTrending } = require('../src/misc/functions');
+      getTrending.mockResolvedValueOnce({ quotes: [] });
+      const result = await trending({ country: 'us' });
+      expect(result).toBeDefined();
+    });
+
+    test('marketSummary should accept ISO country codes', async () => {
+      const { getMarketSummary } = require('../src/misc/functions');
+      getMarketSummary.mockResolvedValueOnce({ marketSummaryResponse: { result: [] } });
+      const result = await marketSummary({ country: 'US' });
+      expect(result).toBeDefined();
     });
 
     test('trending should handle null response from Yahoo API', async () => {
