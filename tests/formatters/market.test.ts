@@ -75,7 +75,8 @@ describe('formatMarketSummaryResponse', () => {
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed).toHaveLength(3);
     expect(parsed[0].symbol).toBe('^GSPC');
-    expect(parsed[0].regularMarketPrice).toEqual({ raw: 4800.50, fmt: '4,800.50' });
+    // Projection extracts raw value from {raw, fmt} pairs
+    expect(parsed[0].regularMarketPrice).toBe(4800.5);
   });
 
   it('items with missing shortName fall back to symbol', () => {

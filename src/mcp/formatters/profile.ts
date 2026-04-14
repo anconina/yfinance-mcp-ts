@@ -9,10 +9,11 @@
  * Imports Phase 1 utilities from the barrel index.
  */
 
+import { DEFAULT_PROFILE_FIELDS } from './constants';
 import {
   formatCompact,
   wrapResponse,
-  serializeResponse,
+  guardSize,
   FormatType,
 } from './index';
 
@@ -156,22 +157,23 @@ export function formatProfileResponse(
     return wrapResponse('No profile data available', { dataType: 'Company Profile' });
   }
 
-  // JSON path: strip officers if not requested, serialize
+  // JSON path: project to curated field set
   if (options.format === 'json') {
+    const fieldSet = new Set<string>(DEFAULT_PROFILE_FIELDS);
+    if (options.include_officers) fieldSet.add('companyOfficers');
     const jsonData: Record<string, unknown> = {};
     for (const sym of symbols) {
       const symData = data[sym];
       if (typeof symData === 'string') {
         jsonData[sym] = { error: symData };
       } else {
-        const obj = { ...(symData as Record<string, unknown>) };
-        if (!options.include_officers) {
-          delete obj.companyOfficers;
-        }
-        jsonData[sym] = obj;
+        const obj = symData as Record<string, unknown>;
+        const p: Record<string, unknown> = {};
+        for (const f of fieldSet) { if (f in obj) p[f] = obj[f]; }
+        jsonData[sym] = p;
       }
     }
-    return serializeResponse(jsonData, 'json');
+    return guardSize(JSON.stringify(jsonData));
   }
 
   // Text path

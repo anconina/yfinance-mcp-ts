@@ -138,9 +138,10 @@ describe('formatEarningsResponse', () => {
     const result = formatEarningsResponse(EARNINGS_FIXTURE, { format: 'json' });
     const parsed = JSON.parse(result);
     expect(parsed).toHaveProperty('AAPL');
-    expect(parsed.AAPL.earningsChart).toBeDefined();
-    expect(parsed.AAPL.financialsChart).toBeDefined();
-    expect(parsed.AAPL.earningsChart.quarterly).toHaveLength(4);
+    // Projection flattens earningsChart/financialsChart into top-level keys
+    expect(parsed.AAPL.quarterly).toBeDefined();
+    expect(parsed.AAPL.quarterly).toHaveLength(4);
+    expect(parsed.AAPL.yearly).toBeDefined();
   });
 
   it('empty data returns "No earnings data"', () => {

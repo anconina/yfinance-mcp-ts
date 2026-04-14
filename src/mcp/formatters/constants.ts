@@ -83,3 +83,44 @@ export const DEFAULT_SCREENER_FIELDS: readonly string[] = [
 
 /** Hard cap for JSON screener responses (higher than text -- structured data is denser). */
 export const SCREENER_JSON_HARD_CAP = 40_000;
+
+/** Default fields for JSON summary responses. Matches the 6 text groups. */
+export const DEFAULT_SUMMARY_FIELDS: readonly string[] = [
+  'trailingPE', 'forwardPE', 'priceToSalesTrailing12Months', 'marketCap',
+  'dividendRate', 'dividendYield', 'payoutRatio', 'exDividendDate',
+  'bid', 'bidSize', 'ask', 'askSize',
+  'dayLow', 'dayHigh', 'fiftyTwoWeekLow', 'fiftyTwoWeekHigh',
+  'volume', 'averageVolume10days', 'averageVolume',
+  'fiftyDayAverage', 'twoHundredDayAverage',
+] as const;
+
+/** Default fields for JSON profile responses. */
+export const DEFAULT_PROFILE_FIELDS: readonly string[] = [
+  'shortName', 'longName', 'sector', 'industry',
+  'address1', 'city', 'state', 'zip', 'country',
+  'website', 'fullTimeEmployees', 'longBusinessSummary',
+  'auditRisk', 'boardRisk', 'compensationRisk', 'overallRisk',
+] as const;
+
+/** Default fields for JSON key stats responses. Matches the 6 text groups. */
+export const DEFAULT_KEYSTATS_FIELDS: readonly string[] = [
+  'forwardPE', 'pegRatio', 'enterpriseToRevenue', 'enterpriseToEbitda', 'priceToBook',
+  'profitMargins', 'operatingMargins', 'returnOnEquity', 'returnOnAssets',
+  'revenueGrowth', 'earningsGrowth', 'earningsQuarterlyGrowth',
+  'beta', 'debtToEquity', 'currentRatio', 'enterpriseValue',
+  'trailingEps', 'forwardEps', 'bookValue', 'revenuePerShare',
+  'sharesOutstanding', 'floatShares', 'shortPercentOfFloat', 'shortRatio',
+] as const;
+
+/** Default fields for JSON market summary responses. */
+export const DEFAULT_MARKET_FIELDS: readonly string[] = [
+  'symbol', 'shortName', 'regularMarketPrice', 'regularMarketChange',
+  'regularMarketChangePercent', 'regularMarketTime',
+] as const;
+
+/** Default fields for JSON trending/search responses. */
+export const DEFAULT_QUOTE_FIELDS: readonly string[] = [
+  'symbol', 'shortName', 'longName', 'quoteType', 'exchange',
+  'regularMarketPrice', 'regularMarketChange', 'regularMarketChangePercent',
+  'marketCap', 'sector', 'industry',
+] as const;
