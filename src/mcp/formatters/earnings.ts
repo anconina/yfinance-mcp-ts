@@ -13,7 +13,7 @@ import {
   formatCompact,
   toMarkdownTable,
   wrapResponse,
-  serializeResponse,
+  guardSize,
   FormatType,
 } from './index';
 
@@ -142,7 +142,7 @@ export function formatEarningsResponse(
     return wrapResponse('No earnings data available', { dataType: 'Earnings' });
   }
 
-  // JSON path
+  // JSON path -- extract only relevant nested data
   if (options.format === 'json') {
     const jsonData: Record<string, unknown> = {};
     for (const sym of symbols) {
@@ -150,10 +150,23 @@ export function formatEarningsResponse(
       if (typeof symData === 'string') {
         jsonData[sym] = { error: symData };
       } else {
-        jsonData[sym] = symData;
+        const raw = symData as Record<string, unknown>;
+        const earningsChart = raw.earningsChart as Record<string, unknown> | undefined;
+        const financialsChart = raw.financialsChart as Record<string, unknown> | undefined;
+        const projected: Record<string, unknown> = {};
+        if (earningsChart) {
+          projected.quarterly = earningsChart.quarterly;
+          projected.currentQuarterEstimate = earningsChart.currentQuarterEstimate;
+          projected.currentQuarterEstimateDate = earningsChart.currentQuarterEstimateDate;
+          projected.currentQuarterEstimateYear = earningsChart.currentQuarterEstimateYear;
+        }
+        if (financialsChart) {
+          projected.yearly = financialsChart.yearly;
+        }
+        jsonData[sym] = projected;
       }
     }
-    return serializeResponse(jsonData, 'json');
+    return guardSize(JSON.stringify(jsonData));
   }
 
   // Text path

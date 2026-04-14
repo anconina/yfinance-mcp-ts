@@ -8,12 +8,14 @@
  * Imports Phase 1 utilities from the barrel index.
  */
 
+import { DEFAULT_MARKET_FIELDS } from './constants';
 import {
   extractValue,
   toMarkdownTable,
   formatCompact,
   formatChange,
   wrapResponse,
+  guardSize,
   FormatType,
 } from './index';
 
@@ -37,9 +39,24 @@ export function formatMarketSummaryResponse(
   data: unknown[],
   options: MarketSummaryFormatOptions = {}
 ): string {
-  // JSON path
+  // JSON path -- project to curated field set, extract raw from {raw, fmt} pairs
   if (options.format === 'json') {
-    return JSON.stringify(data);
+    const fieldSet = new Set<string>(DEFAULT_MARKET_FIELDS);
+    const projected = (data as Record<string, unknown>[]).map(item => {
+      const obj = item as Record<string, unknown>;
+      const p: Record<string, unknown> = {};
+      for (const f of fieldSet) {
+        const val = obj[f];
+        if (val !== undefined) {
+          // extractValue handles {raw, fmt} pairs
+          p[f] = typeof val === 'object' && val !== null && 'raw' in (val as Record<string, unknown>)
+            ? (val as Record<string, unknown>).raw
+            : val;
+        }
+      }
+      return p;
+    });
+    return guardSize(JSON.stringify(projected));
   }
 
   // Text path

@@ -87,24 +87,39 @@ export const COUNTRIES: Record<string, CountryConfig> = {
  * @throws Error if country is not found
  */
 export function getCountryConfig(country: string): CountryConfig {
-  const normalized = country.toLowerCase();
-  const config = COUNTRIES[normalized];
+  const resolved = resolveCountry(country);
 
-  if (!config) {
+  if (!resolved) {
     const validCountries = Object.keys(COUNTRIES).join(', ');
     throw new Error(
       `"${country}" is not a valid country. Valid countries include: ${validCountries}`
     );
   }
 
-  return config;
+  return COUNTRIES[resolved];
 }
 
 /**
- * Check if a country is valid
+ * Resolve a country input to its canonical name.
+ * Accepts full name ("united states") or ISO region code ("US").
+ * Returns the canonical name or undefined if not found.
+ */
+export function resolveCountry(input: string): string | undefined {
+  const lower = input.toLowerCase();
+  if (lower in COUNTRIES) return lower;
+
+  const upper = input.toUpperCase();
+  for (const [name, config] of Object.entries(COUNTRIES)) {
+    if (config.region === upper) return name;
+  }
+  return undefined;
+}
+
+/**
+ * Check if a country is valid (accepts full name or ISO code)
  */
 export function isValidCountry(country: string): boolean {
-  return country.toLowerCase() in COUNTRIES;
+  return resolveCountry(country) !== undefined;
 }
 
 /**

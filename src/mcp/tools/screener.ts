@@ -17,6 +17,7 @@ export const getScreenerSchema = z.object({
   screener: z.string().describe('Screener name (e.g., "day_gainers", "day_losers", "most_actives", "undervalued_growth_stocks")'),
   count: z.number().optional().describe('Number of results to return (default: 10)'),
   format: z.enum(['text', 'json']).optional().describe('Output format (default: text)'),
+  fields: z.array(z.string()).optional().describe('Field names to include per quote in JSON output (default: ~24 common fields). Ignored for text format.'),
 });
 
 export const getScreenerInfoSchema = z.object({
@@ -44,6 +45,7 @@ export async function getScreener(args: z.infer<typeof getScreenerSchema>): Prom
     const data = await screener.getScreeners(args.screener, args.count || 10);
     return formatScreenerResponse(data, {
       format: (args.format as FormatType) || 'text',
+      fields: args.fields,
     });
   } catch (error) {
     throw new Error(`Failed to get screener data: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -79,7 +81,8 @@ export const screenerTools = [
       properties: {
         category: {
           type: 'string',
-          description: 'Filter by category (e.g., "Market Movers", "Value", "Growth", "ETFs", "Sectors")',
+          enum: ['Market Movers', 'Value', 'Growth', 'Analyst Picks', 'Dividends & Income', 'Strategies', 'Crypto', 'ETFs', 'Mutual Funds', 'Sectors'],
+          description: 'Filter by category',
         },
         format: {
           type: 'string',
@@ -110,6 +113,11 @@ export const screenerTools = [
           type: 'string',
           enum: ['text', 'json'],
           description: 'Output format (default: text)',
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Field names to include per quote in JSON output (default: ~24 common fields including symbol, price, change, volume, marketCap, PE ratios, 52wk range, sector). Ignored for text format.',
         },
       },
       required: ['screener'],

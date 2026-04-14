@@ -11,12 +11,12 @@
  * GroupDef and renderGroups to allow independent evolution.
  */
 
-import { NumberContext } from './constants';
+import { NumberContext, DEFAULT_KEYSTATS_FIELDS } from './constants';
 import {
   flattenYahooObject,
   formatCompact,
   wrapResponse,
-  serializeResponse,
+  guardSize,
   FormatType,
 } from './index';
 
@@ -170,9 +170,18 @@ export function formatKeyStatsResponse(
     }
   }
 
-  // Step 2: JSON path
+  // Step 2: JSON path -- project to curated field set
   if (options.format === 'json') {
-    return serializeResponse(normalized, 'json');
+    const fieldSet = new Set<string>(DEFAULT_KEYSTATS_FIELDS);
+    const projected: Record<string, unknown> = {};
+    for (const [sym, val] of Object.entries(normalized)) {
+      const obj = val as Record<string, unknown>;
+      if (obj.error) { projected[sym] = obj; continue; }
+      const p: Record<string, unknown> = {};
+      for (const f of fieldSet) { if (f in obj) p[f] = obj[f]; }
+      projected[sym] = p;
+    }
+    return guardSize(JSON.stringify(projected));
   }
 
   // Step 3: Text path

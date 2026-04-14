@@ -116,6 +116,64 @@ export function formatHint(suggestions: string[]): string {
 }
 
 /**
+ * Size-guard for JSON responses that always returns valid JSON.
+ *
+ * Unlike guardSize (which truncates the string and can produce broken JSON),
+ * this function trims arrays within the data to fit within the cap, then
+ * re-serializes. A `_truncated` field is added to each entry whose array
+ * was reduced.
+ *
+ * Walks one level into top-level values looking for arrays to trim.
+ * Set keepEnd=true for time-series data (keeps most recent entries).
+ *
+ * @param data - The data object (will be mutated when trimming is needed)
+ * @param hardCap - Maximum JSON string length
+ * @param keepEnd - If true, keep tail of arrays; default keeps head
+ * @returns Valid JSON string within the cap
+ */
+export function guardJsonSize(
+  data: Record<string, unknown>,
+  hardCap: number = HARD_CAP_CHARS,
+  keepEnd = false,
+): string {
+  const json = JSON.stringify(data);
+  if (json.length <= hardCap) return json;
+
+  const ratio = (hardCap / json.length) * 0.8;
+
+  for (const [topKey, topVal] of Object.entries(data)) {
+    if (topKey === '_truncated') continue;
+
+    // Top-level arrays (e.g., { screener_name: [q1, q2, ...] })
+    if (Array.isArray(topVal)) {
+      const total = topVal.length;
+      const keep = Math.max(1, Math.floor(total * ratio));
+      if (keep < total) {
+        data[topKey] = keepEnd ? topVal.slice(-keep) : topVal.slice(0, keep);
+        if (!data._truncated) data._truncated = {};
+        (data._truncated as Record<string, unknown>)[topKey] = { total, returned: keep };
+      }
+      continue;
+    }
+
+    // Objects with nested arrays (e.g., { AAPL: { rows: [...] } })
+    if (typeof topVal === 'object' && topVal !== null) {
+      const entry = topVal as Record<string, unknown>;
+      for (const [key, subVal] of Object.entries(entry)) {
+        if (key === '_truncated' || !Array.isArray(subVal)) continue;
+        const total = subVal.length;
+        const keep = Math.max(1, Math.floor(total * ratio));
+        if (keep >= total) continue;
+        entry[key] = keepEnd ? subVal.slice(-keep) : subVal.slice(0, keep);
+        entry._truncated = { total, returned: keep };
+      }
+    }
+  }
+
+  return JSON.stringify(data);
+}
+
+/**
  * Route serialization based on format type (dual-format support skeleton).
  *
  * - JSON: universal compact serializer via JSON.stringify.

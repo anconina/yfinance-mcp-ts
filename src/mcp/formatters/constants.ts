@@ -57,3 +57,71 @@ export const DEFAULT_STRIKE_RANGE = 3;
 
 /** Default maximum expirations shown in options summary view. */
 export const DEFAULT_MAX_EXPIRATIONS = 3;
+
+/**
+ * Default fields projected onto each screener quote in JSON format.
+ * Covers identification, price action, volume, fundamentals, and classification.
+ * Keeps ~20 fields per quote (~2K chars) vs ~86 raw fields (~5K chars).
+ */
+export const DEFAULT_SCREENER_FIELDS: readonly string[] = [
+  // Identification
+  'symbol', 'shortName', 'longName', 'quoteType', 'exchange',
+  // Price action
+  'regularMarketPrice', 'regularMarketChange', 'regularMarketChangePercent',
+  'regularMarketOpen', 'regularMarketDayHigh', 'regularMarketDayLow',
+  'regularMarketPreviousClose', 'regularMarketVolume',
+  // Valuation
+  'marketCap', 'trailingPE', 'forwardPE', 'priceToBook',
+  // Fundamentals
+  'trailingAnnualDividendYield', 'epsTrailingTwelveMonths',
+  // Range context
+  'fiftyTwoWeekHigh', 'fiftyTwoWeekLow',
+  'fiftyDayAverage', 'twoHundredDayAverage',
+  // Classification
+  'sector', 'industry',
+] as const;
+
+/** Hard cap for JSON screener responses (higher than text -- structured data is denser).
+ *  Must stay under the 40K transport cap in server.ts to avoid double-truncation. */
+export const SCREENER_JSON_HARD_CAP = 30_000;
+
+/** Default fields for JSON summary responses. Matches the 6 text groups. */
+export const DEFAULT_SUMMARY_FIELDS: readonly string[] = [
+  'trailingPE', 'forwardPE', 'priceToSalesTrailing12Months', 'marketCap',
+  'dividendRate', 'dividendYield', 'payoutRatio', 'exDividendDate',
+  'bid', 'bidSize', 'ask', 'askSize',
+  'dayLow', 'dayHigh', 'fiftyTwoWeekLow', 'fiftyTwoWeekHigh',
+  'volume', 'averageVolume10days', 'averageVolume',
+  'fiftyDayAverage', 'twoHundredDayAverage',
+] as const;
+
+/** Default fields for JSON profile responses. */
+export const DEFAULT_PROFILE_FIELDS: readonly string[] = [
+  'shortName', 'longName', 'sector', 'industry',
+  'address1', 'city', 'state', 'zip', 'country',
+  'website', 'fullTimeEmployees', 'longBusinessSummary',
+  'auditRisk', 'boardRisk', 'compensationRisk', 'overallRisk',
+] as const;
+
+/** Default fields for JSON key stats responses. Matches the 6 text groups. */
+export const DEFAULT_KEYSTATS_FIELDS: readonly string[] = [
+  'forwardPE', 'pegRatio', 'enterpriseToRevenue', 'enterpriseToEbitda', 'priceToBook',
+  'profitMargins', 'operatingMargins', 'returnOnEquity', 'returnOnAssets',
+  'revenueGrowth', 'earningsGrowth', 'earningsQuarterlyGrowth',
+  'beta', 'debtToEquity', 'currentRatio', 'enterpriseValue',
+  'trailingEps', 'forwardEps', 'bookValue', 'revenuePerShare',
+  'sharesOutstanding', 'floatShares', 'shortPercentOfFloat', 'shortRatio',
+] as const;
+
+/** Default fields for JSON market summary responses. */
+export const DEFAULT_MARKET_FIELDS: readonly string[] = [
+  'symbol', 'shortName', 'regularMarketPrice', 'regularMarketChange',
+  'regularMarketChangePercent', 'regularMarketTime',
+] as const;
+
+/** Default fields for JSON trending/search responses. */
+export const DEFAULT_QUOTE_FIELDS: readonly string[] = [
+  'symbol', 'shortName', 'longName', 'quoteType', 'exchange',
+  'regularMarketPrice', 'regularMarketChange', 'regularMarketChangePercent',
+  'marketCap', 'sector', 'industry',
+] as const;

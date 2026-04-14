@@ -13,6 +13,7 @@ import {
   formatCompact,
   toMarkdownTable,
   wrapResponse,
+  guardSize,
   FormatType,
 } from './index';
 
@@ -75,7 +76,7 @@ export function formatEarningsCalendarResponse(
 ): string {
   // JSON path
   if (options.format === 'json') {
-    return JSON.stringify(data);
+    return guardSize(JSON.stringify(data));
   }
 
   // Text path
@@ -124,7 +125,7 @@ export function formatIPOsResponse(
 ): string {
   // JSON path
   if (options.format === 'json') {
-    return JSON.stringify(data);
+    return guardSize(JSON.stringify(data));
   }
 
   // Text path
@@ -189,7 +190,7 @@ export function formatSplitsResponse(
 ): string {
   // JSON path
   if (options.format === 'json') {
-    return JSON.stringify(data);
+    return guardSize(JSON.stringify(data));
   }
 
   // Text path

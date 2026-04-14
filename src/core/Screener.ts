@@ -117,8 +117,8 @@ export class Screener extends BaseFinance {
    */
   private checkScreenIds(screenIds: string | string[]): string[] {
     const ids = typeof screenIds === 'string'
-      ? screenIds.match(/[a-zA-Z0-9_]+/g) ?? []
-      : screenIds;
+      ? (screenIds.toLowerCase().match(/[a-zA-Z0-9_]+/g) ?? [])
+      : screenIds.map(id => id.toLowerCase());
 
     const invalid = ids.filter((id) => !SCREENERS[id]);
     if (invalid.length > 0) {
@@ -126,7 +126,7 @@ export class Screener extends BaseFinance {
       throw new Error(
         `Invalid screener(s): ${invalid.join(', ')}. ` +
         `Examples of valid screeners: ${availablePreview}... ` +
-        `Use .availableScreeners to see all options.`
+        `Call list_screeners tool to see all available screeners.`
       );
     }
 

@@ -3,6 +3,10 @@ import {
   formatListScreenersResponse,
   formatScreenerResponse,
 } from '../../src/mcp/formatters/screener';
+import {
+  DEFAULT_SCREENER_FIELDS,
+  SCREENER_JSON_HARD_CAP,
+} from '../../src/mcp/formatters/constants';
 
 // --- Fixtures ---
 
@@ -292,5 +296,148 @@ describe('formatScreenerResponse', () => {
     // Should contain dashes for null values
     expect(result).toContain('TEST');
     expect(result).toContain('Test Corp');
+  });
+});
+
+// --- formatScreenerResponse field projection tests ---
+
+/** Extended mock with realistic extra fields that should be filtered out. */
+const EXTENDED_QUOTES = MOCK_QUOTES.map((q) => ({
+  ...q,
+  financialCurrency: 'USD',
+  epsForward: 7.5,
+  bookValue: 50.2,
+  averageAnalystRating: '1.8 - Buy',
+  sourceInterval: 15,
+  exchangeTimezoneName: 'America/New_York',
+  exchangeTimezoneShortName: 'EDT',
+  gmtOffSetMilliseconds: -14400000,
+  language: 'en-US',
+  region: 'US',
+  triggerable: true,
+  customPriceAlertConfidence: 'HIGH',
+  messageBoardId: 'finmb_24937',
+  esgPopulated: false,
+  tradeable: false,
+  cryptoTradeable: false,
+  firstTradeDateMilliseconds: 345479400000,
+  priceHint: 2,
+}));
+
+describe('formatScreenerResponse field projection', () => {
+  it('JSON projection: default fields filters out non-default fields', () => {
+    const data = { day_gainers: { quotes: EXTENDED_QUOTES } };
+    const result = formatScreenerResponse(data, { format: 'json' });
+    const parsed = JSON.parse(result);
+    const quotes = parsed.day_gainers.quotes;
+
+    // Should have the default fields that exist on the quotes
+    for (const q of quotes) {
+      expect(q).toHaveProperty('symbol');
+      expect(q).toHaveProperty('regularMarketPrice');
+      expect(q).toHaveProperty('marketCap');
+    }
+
+    // Should NOT have the extra fields
+    for (const q of quotes) {
+      expect(q).not.toHaveProperty('financialCurrency');
+      expect(q).not.toHaveProperty('sourceInterval');
+      expect(q).not.toHaveProperty('language');
+      expect(q).not.toHaveProperty('region');
+      expect(q).not.toHaveProperty('messageBoardId');
+      expect(q).not.toHaveProperty('esgPopulated');
+      expect(q).not.toHaveProperty('priceHint');
+    }
+  });
+
+  it('JSON projection: custom fields parameter narrows output', () => {
+    const data = { day_gainers: { quotes: EXTENDED_QUOTES } };
+    const result = formatScreenerResponse(data, {
+      format: 'json',
+      fields: ['symbol', 'marketCap'],
+    });
+    const parsed = JSON.parse(result);
+    const quotes = parsed.day_gainers.quotes;
+
+    for (const q of quotes) {
+      const keys = Object.keys(q);
+      expect(keys).toHaveLength(2);
+      expect(q).toHaveProperty('symbol');
+      expect(q).toHaveProperty('marketCap');
+    }
+  });
+
+  it('fields parameter is ignored for text format', () => {
+    const data = { day_gainers: { quotes: MOCK_QUOTES } };
+    const result = formatScreenerResponse(data, {
+      format: 'text',
+      fields: ['symbol'],
+    });
+    // Text format should still contain all 7 columns
+    expect(result).toContain('|Symbol|Name|Price|Change|Chg%|Volume|MCap|');
+    expect(result).toContain('AAPL');
+    expect(result).toContain('Apple Inc.');
+    expect(result).toContain('150.25');
+  });
+
+  it('JSON projection: large payload truncated at SCREENER_JSON_HARD_CAP', () => {
+    // Generate 50 quotes with many fields to exceed the cap
+    const bulkQuotes = Array.from({ length: 50 }, (_, i) => ({
+      symbol: `SYM${i}`,
+      shortName: `Company ${i} With A Reasonably Long Name To Increase Size`,
+      longName: `Company ${i} Corporation International Holdings Ltd`,
+      quoteType: 'EQUITY',
+      exchange: 'NMS',
+      regularMarketPrice: 100 + i,
+      regularMarketChange: i * 0.5,
+      regularMarketChangePercent: i * 0.1,
+      regularMarketOpen: 99 + i,
+      regularMarketDayHigh: 105 + i,
+      regularMarketDayLow: 95 + i,
+      regularMarketPreviousClose: 98 + i,
+      regularMarketVolume: 10000000 + i * 1000000,
+      marketCap: 1000000000000 + i * 50000000000,
+      trailingPE: 20 + i * 0.5,
+      forwardPE: 18 + i * 0.4,
+      priceToBook: 5 + i * 0.2,
+      trailingAnnualDividendYield: 0.02 + i * 0.001,
+      epsTrailingTwelveMonths: 5 + i * 0.3,
+      fiftyTwoWeekHigh: 150 + i,
+      fiftyTwoWeekLow: 80 + i,
+      fiftyDayAverage: 110 + i,
+      twoHundredDayAverage: 105 + i,
+      sector: 'Technology',
+      industry: 'Software',
+      // Extra fields to inflate size
+      financialCurrency: 'USD',
+      averageAnalystRating: '1.8 - Buy',
+      sourceInterval: 15,
+      exchangeTimezoneName: 'America/New_York',
+      exchangeTimezoneShortName: 'EDT',
+      gmtOffSetMilliseconds: -14400000,
+      language: 'en-US',
+      region: 'US',
+    }));
+
+    const data = { day_gainers: { quotes: bulkQuotes } };
+    const result = formatScreenerResponse(data, { format: 'json' });
+    // Allow some margin for truncation notice text
+    expect(result.length).toBeLessThanOrEqual(SCREENER_JSON_HARD_CAP + 200);
+  });
+
+  it('JSON projection: output is valid JSON when under cap', () => {
+    const data = { day_gainers: { quotes: EXTENDED_QUOTES } };
+    const result = formatScreenerResponse(data, { format: 'json' });
+    expect(() => JSON.parse(result)).not.toThrow();
+  });
+
+  it('JSON projection: preserves quotes wrapper structure', () => {
+    const data = { day_gainers: { quotes: EXTENDED_QUOTES } };
+    const result = formatScreenerResponse(data, { format: 'json' });
+    const parsed = JSON.parse(result);
+    expect(parsed).toHaveProperty('day_gainers');
+    expect(parsed.day_gainers).toHaveProperty('quotes');
+    expect(Array.isArray(parsed.day_gainers.quotes)).toBe(true);
+    expect(parsed.day_gainers.quotes).toHaveLength(EXTENDED_QUOTES.length);
   });
 });
