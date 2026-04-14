@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { search, getMarketSummary, getTrending, getCurrencies, getValidCountries } from '../../misc/functions';
 import { isValidCountry } from '../../config/countries';
 import { getMcpSessionOptions } from '../config';
-import { formatMarketSummaryResponse, formatCurrenciesResponse, FormatType } from '../formatters';
+import { formatMarketSummaryResponse, formatCurrenciesResponse, FormatType, guardSize, DEFAULT_QUOTE_FIELDS } from '../formatters';
 
 // Schema definitions
 export const searchStocksSchema = z.object({
@@ -38,7 +38,15 @@ export async function searchStocks(args: z.infer<typeof searchStocksSchema>): Pr
       quotesCount: args.limit || 10,
       sessionOptions: getMcpSessionOptions(),
     });
-    return JSON.stringify(results, null, 2);
+    const fieldSet = new Set<string>(DEFAULT_QUOTE_FIELDS);
+    const projected = results && typeof results === 'object' && Array.isArray((results as Record<string, unknown>).quotes)
+      ? { ...results as Record<string, unknown>, quotes: ((results as Record<string, unknown>).quotes as Record<string, unknown>[]).map((q: Record<string, unknown>) => {
+          const p: Record<string, unknown> = {};
+          for (const f of fieldSet) { if (f in q) p[f] = q[f]; }
+          return p;
+        })}
+      : results;
+    return guardSize(JSON.stringify(projected));
   } catch (error) {
     throw new Error(`Failed to search stocks: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
@@ -70,7 +78,17 @@ export async function trending(args: z.infer<typeof getTrendingSchema>): Promise
     if (args.count && Array.isArray(data.quotes)) {
       data.quotes = data.quotes.slice(0, args.count);
     }
-    return JSON.stringify(data, null, 2);
+    // Project quote fields to curated set
+    const fieldSet = new Set<string>(DEFAULT_QUOTE_FIELDS);
+    const output: Record<string, unknown> = { ...data };
+    if (Array.isArray(data.quotes)) {
+      output.quotes = data.quotes.map((q: Record<string, unknown>) => {
+        const p: Record<string, unknown> = {};
+        for (const f of fieldSet) { if (f in q) p[f] = q[f]; }
+        return p;
+      });
+    }
+    return guardSize(JSON.stringify(output));
   } catch (error) {
     throw new Error(`Failed to get trending stocks: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }

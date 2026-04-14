@@ -464,7 +464,8 @@ describe('MCP Tools', () => {
       const parsed = JSON.parse(result);
 
       expect(parsed.AAPL).toBeDefined();
-      expect(parsed.AAPL.earningsChart).toBeDefined();
+      // Projection flattens earningsChart/financialsChart into top-level keys
+      expect(parsed.AAPL.quarterly).toBeDefined();
     });
   });
 
