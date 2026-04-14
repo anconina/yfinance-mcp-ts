@@ -86,7 +86,7 @@ for (const tool of allTools) {
 const server = new Server(
   {
     name: 'yfinance',
-    version: '1.0.0',
+    version: '1.0.4',
   },
   {
     capabilities: {
