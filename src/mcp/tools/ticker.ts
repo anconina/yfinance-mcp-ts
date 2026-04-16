@@ -51,9 +51,17 @@ export const getStockHistorySchema = z.object({
     .describe('Output format (default: text)'),
 });
 
+/** Canonical financial statement types. */
+const FINANCIALS_TYPE_ALIASES: Record<string, 'income' | 'balance' | 'cashflow' | 'cash' | 'all'> = {
+  income_stmt: 'income',
+  income_statement: 'income',
+  balance_sheet: 'balance',
+  cash_flow: 'cashflow',
+};
+
 export const getFinancialsSchema = z.object({
   symbols: z.string().describe('Stock symbol(s), space-separated'),
-  type: z.enum(['income', 'balance', 'cashflow', 'cash', 'all']).optional().describe('Financial statement type: income, balance, cashflow (or cash), all (default: all)'),
+  type: z.enum(['income', 'income_stmt', 'income_statement', 'balance', 'balance_sheet', 'cashflow', 'cash_flow', 'cash', 'all']).optional().describe('Financial statement type: income, balance, cashflow (or cash), all (default: all)'),
   frequency: z.enum(['annual', 'quarterly']).optional().describe('Data frequency (default: annual)'),
   detail: z.enum(['summary', 'full']).optional().describe('summary = key metrics only, full = all metrics (default: summary)'),
   format: z.enum(['text', 'json']).optional().describe('Output format (default: text)'),
@@ -151,15 +159,20 @@ export async function getFinancials(args: z.infer<typeof getFinancialsSchema>): 
     // Convert frequency to short form: 'a' for annual, 'q' for quarterly
     const freq = args.frequency === 'quarterly' ? 'q' : 'a';
 
+    // Normalize LLM aliases (income_stmt → income, balance_sheet → balance, etc.)
+    const rawType = args.type ?? 'all';
+    const type = FINANCIALS_TYPE_ALIASES[rawType] ?? rawType;
+
     let data: Record<string, unknown> = {};
 
-    switch (args.type) {
+    switch (type) {
       case 'income':
         data = await ticker.getIncomeStatement(freq);
         break;
       case 'balance':
         data = await ticker.getBalanceSheet(freq);
         break;
+      case 'cash':
       case 'cashflow':
         data = await ticker.getCashFlow(freq);
         break;
@@ -172,7 +185,7 @@ export async function getFinancials(args: z.infer<typeof getFinancialsSchema>): 
     return formatFinancialsResponse(data, {
       format: (args.format as FormatType) || 'text',
       detail: (args.detail as 'summary' | 'full') || 'summary',
-      type: ((args.type === 'cash' ? 'cashflow' : args.type) as 'income' | 'balance' | 'cashflow' | 'all') || 'all',
+      type: (type === 'cash' ? 'cashflow' : type) as 'income' | 'balance' | 'cashflow' | 'all',
       frequency: (args.frequency as 'annual' | 'quarterly') || 'annual',
     });
   } catch (error) {
@@ -365,8 +378,8 @@ export const tickerTools = [
         },
         type: {
           type: 'string',
-          enum: ['income', 'balance', 'cashflow', 'cash', 'all'],
-          description: 'Financial statement type: income, balance, cashflow (or cash), all (default: all)',
+          enum: ['income', 'income_stmt', 'income_statement', 'balance', 'balance_sheet', 'cashflow', 'cash_flow', 'cash', 'all'],
+          description: 'Financial statement type: income, balance, cashflow (or cash), all (default: all). Aliases accepted: income_stmt, income_statement, balance_sheet, cash_flow.',
         },
         frequency: {
           type: 'string',
